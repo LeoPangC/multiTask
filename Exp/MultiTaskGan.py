@@ -11,13 +11,14 @@ from model.Unet import DownsampleLayer, UpSampleLayer
 from DataProcess import WindSet, GetWindSet
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
+from draw import draw_pics
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=200, help="number of epochs of training")
 parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
 parser.add_argument("--D_lr", type=float, default=0.0001, help="adam: learning rate")
-parser.add_argument("--G_lr", type=float, default=0.0001, help="adam: learning rate")
+parser.add_argument("--G_lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--n_cpu", type=int, default=2, help="number of cpu threads to use during batch generation")
@@ -152,98 +153,59 @@ gfsu_path = 'gfsu_train.npy'
 # u10_train_dataloader = DataLoader(wind_train, batch_size=64, shuffle=False, drop_last=False)
 era5v_path = 'era5v_train.npy'
 gfsv_path = 'gfsv_train.npy'
-wind_train = GetWindSet(gfsu_path=gfsu_path, era5u_path=era5u_path, gfsv_path=gfsv_path, era5v_path=era5v_path)
-u10_train_dataloader = DataLoader(wind_train, batch_size=64, shuffle=False, drop_last=False)
+path = '/media/upc/ECEA553BEA5502EE/code/multiTask/Dataset'
+gfsu_data = np.load(os.path.join(path, gfsu_path))
+era5u_data = np.load(os.path.join(path, era5u_path))
+gfsv_data = np.load(os.path.join(path, gfsv_path))
+era5v_data = np.load(os.path.join(path, era5v_path))
+wind_train = GetWindSet(gfsu_data=gfsu_data[:9000], era5u_data=era5u_data[:9000], gfsv_data=gfsv_data[:9000], era5v_data=era5v_data[:9000])
+train_dataloader = DataLoader(wind_train, batch_size=64, shuffle=False, drop_last=False)
+wind_valid = GetWindSet(gfsu_data=gfsu_data[9000: 500], era5u_data=era5u_data[9000: 500], gfsv_data=gfsv_data[9000: 500], era5v_data=era5v_data[9000: 500])
+valid_dataloader = DataLoader(wind_valid, batch_size=64, shuffle=False, drop_last=False)
 # era5_max = 33.646434819152795
 # era5_min = -33.950101286059635
 # gfs_max = 51.68731
 # gfs_min = -60.689964
 for epoch in range(opt.n_epochs):  # epoch:50
-    # transformer.train()
-    # train_epoch_loss = []
+
     generator.train()
     # discriminator.train()
     # D_train_epoch_loss = []
     G_train_epoch_loss = []
-    for i, (dataX, dataY) in enumerate(u10_train_dataloader):  # dataX:(64, 1, 180, 180) dataY:(64, 1, 180, 180)
-        # dataX = (dataX - gfs_min) / (gfs_max - gfs_min)
-        # dataY = (dataY - era5_min) / (era5_max - era5_min)
-        # =============================训练判别器==================
-        # real_label = torch.ones(dataY.size(0), 1).to(opt.device) # 定义真实的图片label为1
-        # fake_label = torch.zeros(dataX.size(0), 1).to(opt.device)  # 定义假的图片的label为0
+    for i, (dataX, dataY) in enumerate(train_dataloader):  # dataX:(64, 1, 180, 180) dataY:(64, 1, 180, 180)
         dataX = dataX.to(torch.float32).to(opt.device)
         dataY = dataY.to(torch.float32).to(opt.device)
 
-        # ---------------------
-        # Train Discriminator
-        # 分为两部分：1、真的图像判别为真；2、假的图像判别为假
-        # ---------------------
-        # 计算真实图片的损失
-        # real_out = discriminator(dataY)  # 将真实图片放入判别器中
-        # loss_real_D = criterion_b(real_out, real_label)  # 得到真实图片的loss
-        # real_scores = real_out  # 得到真实图片的判别值，输出的值越接近1越好
-        # # 计算假的图片的损失
-        # fake_img = generator(dataX).detach()  # 随机噪声放入生成网络中，生成一张假的图片。
-        # fake_out = discriminator(fake_img)  # 判别器判断假的图片
-        # loss_fake_D = criterion_b(fake_out, fake_label)  # 得到假的图片的loss
-        # fake_scores = fake_out  # 得到假图片的判别值，对于判别器来说，假图片的损失越接近0越好
-        # # 损失函数和优化
-        # loss_D = loss_real_D + loss_fake_D  # 损失包括判真损失和判假损失
-        # optimizer_D.zero_grad()  # 在反向传播之前，先将梯度归0
-        # loss_D.backward()  # 将误差反向传播
-        # optimizer_D.step()  # 更新参数
-
-        # -----------------
-        # Train Generator
-        # 原理：目的是希望生成的假的图片被判别器判断为真的图片，
-        # 在此过程中，将判别器固定，将假的图片传入判别器的结果与真实的label对应，
-        # 反向传播更新的参数是生成网络里面的参数，
-        # 这样可以通过更新生成网络里面的参数，来训练网络，使得生成的图片让判别器以为是真的, 这样就达到了对抗的目的
-        # -----------------
-        output = generator(dataX)  # 随机噪声输入到生成器中，得到一副假的图片
-        # output = discriminator(fake_img)  # 经过判别器得到的结果
+        output = generator(dataX)
         # 损失函数和优化
         loss_G = criterion(output, dataY)  # 得到的假的图片与真实的图片的label的loss
         optimizer_G.zero_grad()  # 梯度归0
         loss_G.backward()  # 进行反向传播
         optimizer_G.step()  # step()一般用在反向传播后面,用于更新生成网络的参数
 
-        # outputs = transformer(dataX)
-        # optimizer.zero_grad()
-        # loss = criterion(dataY, outputs)
-        # loss.backward()
-        # optimizer.step()
-        # D_train_epoch_loss.append(loss_D.item())
         G_train_epoch_loss.append(loss_G.item())
-        # train_loss.append(loss.item())
-        if i % (len(u10_train_dataloader)//2) == 0:
-            # print(
-            #     "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] [D real: %f] [D fake: %f]"
-            #     % (epoch, opt.n_epochs, i, len(u10_train_dataloader), loss_D.item(), loss_G.item(), real_scores.data.mean(),
-            #        fake_scores.data.mean())
-            # )
+        if i % (len(train_dataloader)//2) == 0:
             print("epoch={}/{},{}/{}of train, loss={}".format(
-                epoch, opt.n_epochs, i, len(u10_train_dataloader), loss_G.item()))
+                epoch, opt.n_epochs, i, len(train_dataloader), loss_G.item()))
         # 保存训练过程中的图像
-        batches_done = epoch * len(u10_train_dataloader) + i
+        batches_done = epoch * len(train_dataloader) + i
         if batches_done % opt.sample_interval == 0:
-            save_image(output.data[:25], "../images/unet/%d.png" % batches_done, nrow=5, normalize=True)
+            save_image(output.data[:25], "../images/unet/%d.png" % batches_done, nrow=5)
+            draw_pics(output.data[0], batches_done)
     # D_train_epochs_loss.append(np.average(D_train_epoch_loss))
     G_train_epochs_loss.append(np.average(G_train_epoch_loss))
 
     # =====================valid============================
-    # transformer.eval()
-    # valid_epoch_loss = []
-    # for idx, (dataX, dataY) in enumerate(u10_valid_dataloader, 0):
-    #     # dataX = (dataX - gfs_min) / (gfs_max - gfs_min)
-    #     # dataY = (dataY - era5_min) / (era5_max - era5_min)
-    #     dataX = dataX.to(torch.float32).to(opt.device)
-    #     dataY = dataY.to(torch.float32).to(opt.device)
-    #     outputs = transformer(dataX)
-    #     loss = criterion(dataY, outputs)
-    #     valid_epoch_loss.append(loss.item())
-    #     valid_loss.append(loss.item())
-    # valid_epochs_loss.append(np.average(valid_epoch_loss))
+    generator.eval()
+    valid_epoch_loss = []
+    for idx, (dataX, dataY) in enumerate(valid_dataloader, 0):
+        dataX = dataX.to(torch.float32).to(opt.device)
+        dataY = dataY.to(torch.float32).to(opt.device)
+        outputs = generator(dataX)
+        loss = criterion(dataY, outputs)
+        valid_epoch_loss.append(loss.item())
+        valid_loss.append(loss.item())
+    valid_epochs_loss.append(np.average(valid_epoch_loss))
 
     # ====================adjust lr========================
     # D_lr_adjust = {
@@ -278,4 +240,4 @@ plt.plot(G_train_epochs_loss[1:], '--', label="G train_loss")
 plt.plot(valid_epochs_loss[1:], '--', label="valid_loss")
 plt.title("epochs_loss")
 plt.legend()
-plt.show()
+plt.savefig('../images/unet/loss.png')

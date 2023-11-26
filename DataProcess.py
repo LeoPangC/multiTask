@@ -35,13 +35,8 @@ class WindSet(Dataset):
 
 
 class GetWindSet(Dataset):
-    def __init__(self, gfsu_path, era5u_path, gfsv_path, era5v_path):
+    def __init__(self, gfsu_data, era5u_data, gfsv_data, era5v_data):
         data = []
-        path = '/Users/pangcong/PycharmProjects/multiTaskEncoderGAN'
-        gfsu_data = np.load(os.path.join(path, gfsu_path))
-        era5u_data = np.load(os.path.join(path, era5u_path))
-        gfsv_data = np.load(os.path.join(path, gfsv_path))
-        era5v_data = np.load(os.path.join(path, era5v_path))
         assert gfsu_data.shape == era5v_data.shape, '数据数量不匹配'
         gfsu_data = np.expand_dims(gfsu_data, axis=1)
         era5u_data = np.expand_dims(era5u_data, axis=1)
