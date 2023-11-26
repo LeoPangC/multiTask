@@ -22,5 +22,5 @@ for i, nc_file in enumerate(nc_list):
     except:
         u10_gfs = u10
         v10_gfs = v10
-np.save('u10_gfs.npy', u10_gfs)
-np.save('v10_gfs.npy', v10_gfs)
+np.save('Dataset/u10_gfs.npy', u10_gfs)
+np.save('Dataset/v10_gfs.npy', v10_gfs)

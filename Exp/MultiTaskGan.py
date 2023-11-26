@@ -116,128 +116,129 @@ class Discriminator(nn.Module):
         return validity
 
 
-# 生成器判别器
-generator = Generator().to(opt.device)
-# discriminator = Discriminator().to(opt.device)
+if __name__ == '__main__':
+    # 生成器判别器
+    generator = Generator().to(opt.device)
+    # discriminator = Discriminator().to(opt.device)
 
-criterion = torch.nn.MSELoss(reduction='mean')
-# 定义分类损失函数
-# criterion_b = nn.BCELoss()
-# 其次定义 优化函数,优化函数的学习率为0.0003
-# betas:用于计算梯度以及梯度平方的运行平均值的系数
+    criterion = torch.nn.MSELoss(reduction='mean')
+    # 定义分类损失函数
+    # criterion_b = nn.BCELoss()
+    # 其次定义 优化函数,优化函数的学习率为0.0003
+    # betas:用于计算梯度以及梯度平方的运行平均值的系数
 
-optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.G_lr, betas=(opt.b1, opt.b2))
-# optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.D_lr, betas=(opt.b1, opt.b2))
+    optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.G_lr, betas=(opt.b1, opt.b2))
+    # optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.D_lr, betas=(opt.b1, opt.b2))
 
-if torch.cuda.is_available():
-    # transformer = transformer.cuda()
-    generator = generator.cuda()
-    # discriminator = discriminator.cuda()
-    criterion = criterion.cuda()
-    # criterion_b = criterion_b.cuda()
-
-
-train_loss = []
-valid_loss = []
-D_train_epochs_loss = []
-G_train_epochs_loss = []
-valid_epochs_loss = []
-
-# ----------
-#  Training
-# ----------
-# 进行多个epoch的训练
-era5u_path = 'era5u_train.npy'
-gfsu_path = 'gfsu_train.npy'
-# wind_train = WindSet(gfs_path=gfs_path, era5_path=era5u_path)
-# u10_train_dataloader = DataLoader(wind_train, batch_size=64, shuffle=False, drop_last=False)
-era5v_path = 'era5v_train.npy'
-gfsv_path = 'gfsv_train.npy'
-path = '/media/upc/ECEA553BEA5502EE/code/multiTask/Dataset'
-gfsu_data = np.load(os.path.join(path, gfsu_path))
-era5u_data = np.load(os.path.join(path, era5u_path))
-gfsv_data = np.load(os.path.join(path, gfsv_path))
-era5v_data = np.load(os.path.join(path, era5v_path))
-wind_train = GetWindSet(gfsu_data=gfsu_data[:9000], era5u_data=era5u_data[:9000], gfsv_data=gfsv_data[:9000], era5v_data=era5v_data[:9000])
-train_dataloader = DataLoader(wind_train, batch_size=64, shuffle=False, drop_last=False)
-wind_valid = GetWindSet(gfsu_data=gfsu_data[9000: 500], era5u_data=era5u_data[9000: 500], gfsv_data=gfsv_data[9000: 500], era5v_data=era5v_data[9000: 500])
-valid_dataloader = DataLoader(wind_valid, batch_size=64, shuffle=False, drop_last=False)
-# era5_max = 33.646434819152795
-# era5_min = -33.950101286059635
-# gfs_max = 51.68731
-# gfs_min = -60.689964
-for epoch in range(opt.n_epochs):  # epoch:50
-
-    generator.train()
-    # discriminator.train()
-    # D_train_epoch_loss = []
-    G_train_epoch_loss = []
-    for i, (dataX, dataY) in enumerate(train_dataloader):  # dataX:(64, 1, 180, 180) dataY:(64, 1, 180, 180)
-        dataX = dataX.to(torch.float32).to(opt.device)
-        dataY = dataY.to(torch.float32).to(opt.device)
-
-        output = generator(dataX)
-        # 损失函数和优化
-        loss_G = criterion(output, dataY)  # 得到的假的图片与真实的图片的label的loss
-        optimizer_G.zero_grad()  # 梯度归0
-        loss_G.backward()  # 进行反向传播
-        optimizer_G.step()  # step()一般用在反向传播后面,用于更新生成网络的参数
-
-        G_train_epoch_loss.append(loss_G.item())
-        if i % (len(train_dataloader)//2) == 0:
-            print("epoch={}/{},{}/{}of train, loss={}".format(
-                epoch, opt.n_epochs, i, len(train_dataloader), loss_G.item()))
-        # 保存训练过程中的图像
-        batches_done = epoch * len(train_dataloader) + i
-        if batches_done % opt.sample_interval == 0:
-            save_image(output.data[:25], "../images/unet/%d.png" % batches_done, nrow=5)
-            draw_pics(output.data[0], batches_done)
-    # D_train_epochs_loss.append(np.average(D_train_epoch_loss))
-    G_train_epochs_loss.append(np.average(G_train_epoch_loss))
-
-    # =====================valid============================
-    generator.eval()
-    valid_epoch_loss = []
-    for idx, (dataX, dataY) in enumerate(valid_dataloader, 0):
-        dataX = dataX.to(torch.float32).to(opt.device)
-        dataY = dataY.to(torch.float32).to(opt.device)
-        outputs = generator(dataX)
-        loss = criterion(dataY, outputs)
-        valid_epoch_loss.append(loss.item())
-        valid_loss.append(loss.item())
-    valid_epochs_loss.append(np.average(valid_epoch_loss))
-
-    # ====================adjust lr========================
-    # D_lr_adjust = {
-    #     2: 1e-5, 4: 5e-6, 6: 1e-6, 8: 5e-7,
-    #     10: 1e-7, 15: 5e-8, 20: 1e-8
-    # }
-    # G_lr_adjust = {
-    #     2: 5e-5, 4: 1e-5, 6: 5e-6, 8: 1e-6,
-    #     10: 5e-7, 15: 1e-7, 20: 5e-8
-    # }
-    # if epoch in D_lr_adjust.keys():
-    #     lr = D_lr_adjust[epoch]
-    #     for param_group in optimizer_D.param_groups:
-    #         param_group['lr'] = lr
-    # if epoch in G_lr_adjust.keys():
-    #     lr = G_lr_adjust[epoch]
-    #     for param_group in optimizer_G.param_groups:
-    #         param_group['lr'] = lr
-    #     print('Updating learning rate to {}'.format(lr))
-    # torch.save(transformer.state_dict(), './save/gan/wind_u_{}.pth'.format(epoch))
-    torch.save(generator.state_dict(), '../save/unet/unet_{}.pth'.format(epoch))
-    # torch.save(discriminator.state_dict(), '../save/gan/discriminator_u_{}.pth'.format(epoch))
+    if torch.cuda.is_available():
+        # transformer = transformer.cuda()
+        generator = generator.cuda()
+        # discriminator = discriminator.cuda()
+        criterion = criterion.cuda()
+        # criterion_b = criterion_b.cuda()
 
 
-plt.figure(figsize=(12, 4))
-# plt.subplot(121)
-plt.plot(train_loss[:])
-plt.title("train_loss")
-# plt.subplot(122)
-# plt.plot(D_train_epochs_loss[1:], '--', label="D train_loss")
-plt.plot(G_train_epochs_loss[1:], '--', label="G train_loss")
-plt.plot(valid_epochs_loss[1:], '--', label="valid_loss")
-plt.title("epochs_loss")
-plt.legend()
-plt.savefig('../images/unet/loss.png')
+    train_loss = []
+    valid_loss = []
+    D_train_epochs_loss = []
+    G_train_epochs_loss = []
+    valid_epochs_loss = []
+
+    # ----------
+    #  Training
+    # ----------
+    # 进行多个epoch的训练
+    era5u_path = 'era5u_train.npy'
+    gfsu_path = 'gfsu_train.npy'
+    # wind_train = WindSet(gfs_path=gfs_path, era5_path=era5u_path)
+    # u10_train_dataloader = DataLoader(wind_train, batch_size=64, shuffle=False, drop_last=False)
+    era5v_path = 'era5v_train.npy'
+    gfsv_path = 'gfsv_train.npy'
+    path = '/media/upc/ECEA553BEA5502EE/code/multiTask/Dataset'
+    gfsu_data = np.load(os.path.join(path, gfsu_path))
+    era5u_data = np.load(os.path.join(path, era5u_path))
+    gfsv_data = np.load(os.path.join(path, gfsv_path))
+    era5v_data = np.load(os.path.join(path, era5v_path))
+    wind_train = GetWindSet(gfsu_data=gfsu_data[:9000], era5u_data=era5u_data[:9000], gfsv_data=gfsv_data[:9000], era5v_data=era5v_data[:9000])
+    train_dataloader = DataLoader(wind_train, batch_size=64, shuffle=False, drop_last=False)
+    wind_valid = GetWindSet(gfsu_data=gfsu_data[9000: 500], era5u_data=era5u_data[9000: 500], gfsv_data=gfsv_data[9000: 500], era5v_data=era5v_data[9000: 500])
+    valid_dataloader = DataLoader(wind_valid, batch_size=64, shuffle=False, drop_last=False)
+    # era5_max = 33.646434819152795
+    # era5_min = -33.950101286059635
+    # gfs_max = 51.68731
+    # gfs_min = -60.689964
+    for epoch in range(opt.n_epochs):  # epoch:50
+
+        generator.train()
+        # discriminator.train()
+        # D_train_epoch_loss = []
+        G_train_epoch_loss = []
+        for i, (dataX, dataY) in enumerate(train_dataloader):  # dataX:(64, 1, 180, 180) dataY:(64, 1, 180, 180)
+            dataX = dataX.to(torch.float32).to(opt.device)
+            dataY = dataY.to(torch.float32).to(opt.device)
+
+            output = generator(dataX)
+            # 损失函数和优化
+            loss_G = criterion(output, dataY)  # 得到的假的图片与真实的图片的label的loss
+            optimizer_G.zero_grad()  # 梯度归0
+            loss_G.backward()  # 进行反向传播
+            optimizer_G.step()  # step()一般用在反向传播后面,用于更新生成网络的参数
+
+            G_train_epoch_loss.append(loss_G.item())
+            if i % (len(train_dataloader)//2) == 0:
+                print("epoch={}/{},{}/{}of train, loss={}".format(
+                    epoch, opt.n_epochs, i, len(train_dataloader), loss_G.item()))
+            # 保存训练过程中的图像
+            batches_done = epoch * len(train_dataloader) + i
+            if batches_done % opt.sample_interval == 0:
+                save_image(output.data[:25], "../images/unet/%d.png" % batches_done, nrow=5)
+                draw_pics(output.data[0], batches_done)
+        # D_train_epochs_loss.append(np.average(D_train_epoch_loss))
+        G_train_epochs_loss.append(np.average(G_train_epoch_loss))
+
+        # =====================valid============================
+        generator.eval()
+        valid_epoch_loss = []
+        for idx, (dataX, dataY) in enumerate(valid_dataloader, 0):
+            dataX = dataX.to(torch.float32).to(opt.device)
+            dataY = dataY.to(torch.float32).to(opt.device)
+            outputs = generator(dataX)
+            loss = criterion(dataY, outputs)
+            valid_epoch_loss.append(loss.item())
+            valid_loss.append(loss.item())
+        valid_epochs_loss.append(np.average(valid_epoch_loss))
+
+        # ====================adjust lr========================
+        # D_lr_adjust = {
+        #     2: 1e-5, 4: 5e-6, 6: 1e-6, 8: 5e-7,
+        #     10: 1e-7, 15: 5e-8, 20: 1e-8
+        # }
+        # G_lr_adjust = {
+        #     2: 5e-5, 4: 1e-5, 6: 5e-6, 8: 1e-6,
+        #     10: 5e-7, 15: 1e-7, 20: 5e-8
+        # }
+        # if epoch in D_lr_adjust.keys():
+        #     lr = D_lr_adjust[epoch]
+        #     for param_group in optimizer_D.param_groups:
+        #         param_group['lr'] = lr
+        # if epoch in G_lr_adjust.keys():
+        #     lr = G_lr_adjust[epoch]
+        #     for param_group in optimizer_G.param_groups:
+        #         param_group['lr'] = lr
+        #     print('Updating learning rate to {}'.format(lr))
+        # torch.save(transformer.state_dict(), './save/gan/wind_u_{}.pth'.format(epoch))
+        torch.save(generator.state_dict(), '../save/unet/unet_{}.pth'.format(epoch))
+        # torch.save(discriminator.state_dict(), '../save/gan/discriminator_u_{}.pth'.format(epoch))
+
+
+    plt.figure(figsize=(12, 4))
+    # plt.subplot(121)
+    plt.plot(train_loss[:])
+    plt.title("train_loss")
+    # plt.subplot(122)
+    # plt.plot(D_train_epochs_loss[1:], '--', label="D train_loss")
+    plt.plot(G_train_epochs_loss[1:], '--', label="G train_loss")
+    plt.plot(valid_epochs_loss[1:], '--', label="valid_loss")
+    plt.title("epochs_loss")
+    plt.legend()
+    plt.savefig('../images/unet/loss.png')

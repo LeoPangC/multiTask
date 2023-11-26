@@ -20,5 +20,5 @@ v10_era5 = np.delete(v10_era5, 9194, axis=0)
 v10_era5 = np.delete(v10_era5, 10097, axis=0)
 # 前8767个是2016-2021年的数据
 
-np.save('u10_era5.npy', u10_era5)
-np.save('v10_era5.npy', v10_era5)
+np.save('Dataset/u10_era5.npy', u10_era5)
+np.save('Dataset/v10_era5.npy', v10_era5)

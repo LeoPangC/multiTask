@@ -43,8 +43,8 @@ img_area = np.prod(img_shape)
 # 设置cuda:(cuda:0)
 opt.device, = [torch.device("cuda:0" if torch.cuda.is_available() else "cpu")]
 
-u10_gfs = np.load('u10_gfs.npy')
-v10_gfs = np.load('v10_gfs.npy')
+u10_gfs = np.load('Dataset/u10_gfs.npy')
+v10_gfs = np.load('Dataset/v10_gfs.npy')
 u10_gfs = np.expand_dims(u10_gfs, axis=1)
 v10_gfs = np.expand_dims(v10_gfs, axis=1)
 wind_gfs = np.concatenate((u10_gfs, v10_gfs), axis=1)
@@ -142,8 +142,8 @@ valid_epochs_loss = []
 #  Training
 # ----------
 # 进行多个epoch的训练
-era5u_path = 'era5u_train.npy'
-gfs_path = 'gfsu_train.npy'
+era5u_path = 'Dataset/era5u_train.npy'
+gfs_path = 'Dataset/gfsu_train.npy'
 wind_train = WindSet(gfs_path=gfs_path, era5_path=era5u_path)
 u10_train_dataloader = DataLoader(wind_train, batch_size=64, shuffle=False, drop_last=False)
 era5u_path = 'era5u_test.npy'
