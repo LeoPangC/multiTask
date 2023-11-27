@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from MultiTaskGan import Generator
+from MultiTaskUnet import Generator
 from draw import draw_pics
 
 
@@ -23,8 +23,16 @@ gfs_v10_input = np.expand_dims(gfs_v10_input, axis=1)
 era5_u10_label = np.expand_dims(era5_u10_label, axis=1)
 era5_v10_label = np.expand_dims(era5_v10_label, axis=1)
 
-gfs_input = np.concatenate((gfs_u10_input, gfs_v10_input), axis=1)
-era5_label = np.concatenate((era5_u10_label, era5_v10_label), axis=1)
+deg = 180.0 / np.pi
+era5_speed = np.sqrt(era5_u10_label ** 2 + era5_v10_label ** 2)
+gfs_speed = np.sqrt(gfs_u10_input ** 2 + gfs_v10_input ** 2)
+era5_dir = 180.0 + np.arctan2(era5_u10_label, era5_v10_label) * deg
+gfs_dir = 180.0 + np.arctan2(gfs_u10_input, gfs_v10_input) * deg
+
+# gfs_input = np.concatenate((gfs_u10_input, gfs_v10_input), axis=1)
+# era5_label = np.concatenate((era5_u10_label, era5_v10_label), axis=1)
+gfs_input = np.concatenate((gfs_speed, gfs_dir), axis=1)
+era5_label = np.concatenate((era5_speed, era5_dir), axis=1)
 
 # 计算初试RMSE
 b, _, h, w = gfs_u10_input.shape
@@ -42,12 +50,19 @@ with torch.no_grad():
     gfs_input = gfs_input.to(device)
     predict_result = model(gfs_input)
 predict_result = predict_result.cpu().numpy()
-u10_rmse_predict = np.sqrt(np.sum((predict_result[:, :1]-era5_u10_label)**2)/(b*h*w))
+
+# u10 = predict_result[:, :1]
+# v10 = predict_result[:, 1:]
+rad = np.pi/180.0
+u10 = -predict_result[:, :1] * np.sin(predict_result[:, 1:] * rad)
+v10 = -predict_result[:, :1] * np.cos(predict_result[:, 1:] * rad)
+
+u10_rmse_predict = np.sqrt(np.sum((u10-era5_u10_label)**2)/(b*h*w))
 print('u10的订正RMSE是：', u10_rmse_predict)
-v10_rmse_predict = np.sqrt(np.sum((predict_result[:, 1:]-era5_v10_label)**2)/(b*h*w))
+v10_rmse_predict = np.sqrt(np.sum((v10-era5_v10_label)**2)/(b*h*w))
 print('v10的订正RMSE是：', v10_rmse_predict)
-print('u10:', (u10_rmse_origin-u10_rmse_predict)/u10_rmse_origin)
-print('v10:', (v10_rmse_origin-v10_rmse_predict)/v10_rmse_origin)
+print('u10提升度:', (u10_rmse_origin-u10_rmse_predict)/u10_rmse_origin)
+print('v10提升度:', (v10_rmse_origin-v10_rmse_predict)/v10_rmse_origin)
 
 # 生成订正后的图
 # output = np.concatenate((predict_result[:, 0:1], era5_v10_label), axis=1)
