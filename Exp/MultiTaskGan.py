@@ -159,14 +159,23 @@ if __name__ == '__main__':
     era5u_data = np.load(os.path.join(path, era5u_path))
     gfsv_data = np.load(os.path.join(path, gfsv_path))
     era5v_data = np.load(os.path.join(path, era5v_path))
-    wind_train = GetWindSet(gfsu_data=gfsu_data[:9000], era5u_data=era5u_data[:9000], gfsv_data=gfsv_data[:9000], era5v_data=era5v_data[:9000])
+
+    deg = 180.0 / np.pi
+    era5_speed = np.sqrt(era5u_data ** 2 + era5v_data ** 2)
+    gfs_speed = np.sqrt(gfsu_data ** 2 + gfsv_data ** 2)
+    era5_dir = 180.0 + np.arctan2(era5u_data, era5v_data) * deg
+    gfs_dir = 180.0 + np.arctan2(gfsu_data, gfsv_data) * deg
+
+    s_max = 64.817894
+    era5_speed = era5_speed / s_max
+    gfs_speed = gfs_speed / s_max
+    era5_dir = era5_dir / 360.0
+    gfs_dir = gfs_dir / 360.0
+    wind_train = GetWindSet(gfs_data_1=gfs_speed[:9000], era5_data_1=era5_speed[:9000], gfs_data_2=gfs_dir[:9000], era5_data_2=era5_dir[:9000])
     train_dataloader = DataLoader(wind_train, batch_size=64, shuffle=False, drop_last=False)
-    wind_valid = GetWindSet(gfsu_data=gfsu_data[9000: 500], era5u_data=era5u_data[9000: 500], gfsv_data=gfsv_data[9000: 500], era5v_data=era5v_data[9000: 500])
+    wind_valid = GetWindSet(gfs_data_1=gfs_speed[9000: 500], era5_data_1=era5_speed[9000: 500], gfs_data_2=gfs_dir[9000: 500], era5_data_2=era5_dir[9000: 500])
     valid_dataloader = DataLoader(wind_valid, batch_size=64, shuffle=False, drop_last=False)
-    # era5_max = 33.646434819152795
-    # era5_min = -33.950101286059635
-    # gfs_max = 51.68731
-    # gfs_min = -60.689964
+
     for epoch in range(opt.n_epochs):  # epoch:50
 
         generator.train()
@@ -191,8 +200,8 @@ if __name__ == '__main__':
             # 保存训练过程中的图像
             batches_done = epoch * len(train_dataloader) + i
             if batches_done % opt.sample_interval == 0:
-                save_image(output.data[:25], "../images/unet/%d.png" % batches_done, nrow=5)
-                draw_pics(output.data[0], batches_done)
+                save_image(output.data[:25], "../images/unet_sd/%d.png" % batches_done, nrow=5)
+                # draw_pics(output.data[0], batches_done)
             # D_train_epochs_loss.append(np.average(D_train_epoch_loss))
             G_train_epochs_loss.append(np.average(G_train_epoch_loss))
 
@@ -227,7 +236,7 @@ if __name__ == '__main__':
             #         param_group['lr'] = lr
             #     print('Updating learning rate to {}'.format(lr))
             # torch.save(transformer.state_dict(), './save/gan/wind_u_{}.pth'.format(epoch))
-            torch.save(generator.state_dict(), '../save/unet/unet_{}.pth'.format(epoch))
+            torch.save(generator.state_dict(), '../save/unet_sd/unet_{}.pth'.format(epoch))
             # torch.save(discriminator.state_dict(), '../save/gan/discriminator_u_{}.pth'.format(epoch))
 
 
@@ -241,4 +250,4 @@ if __name__ == '__main__':
     plt.plot(valid_epochs_loss[1:], '--', label="valid_loss")
     plt.title("epochs_loss")
     plt.legend()
-    plt.savefig('../images/unet/loss.png')
+    plt.savefig('../images/unet_sd/loss.png')

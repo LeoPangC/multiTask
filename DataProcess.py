@@ -35,15 +35,15 @@ class WindSet(Dataset):
 
 
 class GetWindSet(Dataset):
-    def __init__(self, gfsu_data, era5u_data, gfsv_data, era5v_data):
+    def __init__(self, gfs_data_1, era5_data_1, gfs_data_2, era5_data_2):
         data = []
-        assert gfsu_data.shape == era5v_data.shape, '数据数量不匹配'
-        gfsu_data = np.expand_dims(gfsu_data, axis=1)
-        era5u_data = np.expand_dims(era5u_data, axis=1)
-        gfsv_data = np.expand_dims(gfsv_data, axis=1)
-        era5v_data = np.expand_dims(era5v_data, axis=1)
-        gfs_data = np.concatenate((gfsu_data, gfsv_data), axis=1)
-        era5_data = np.concatenate((era5u_data, era5v_data), axis=1)
+        assert gfs_data_1.shape == era5_data_2.shape, '数据数量不匹配'
+        gfs_data_1 = np.expand_dims(gfs_data_1, axis=1)
+        era5_data_1 = np.expand_dims(era5_data_1, axis=1)
+        gfs_data_2 = np.expand_dims(gfs_data_2, axis=1)
+        era5_data_2 = np.expand_dims(era5_data_2, axis=1)
+        gfs_data = np.concatenate((gfs_data_1, gfs_data_2), axis=1)
+        era5_data = np.concatenate((era5_data_1, era5_data_2), axis=1)
 
         for i in range(gfs_data.shape[0]):
             data.append((gfs_data[i], era5_data[i]))

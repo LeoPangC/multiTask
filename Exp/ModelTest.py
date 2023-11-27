@@ -12,8 +12,8 @@ model.eval()
 model.cuda()
 
 # 数据读取
-left = 10000
-right = 11000
+left = 2000
+right = 2200
 gfs_u10_input = np.load('../Dataset/u10_gfs.npy')[left:right, :96, :96]
 gfs_v10_input = np.load('../Dataset/v10_gfs.npy')[left:right, :96, :96]
 era5_u10_label = np.load('../Dataset/u10_era5.npy')[left:right, :96, :96]
