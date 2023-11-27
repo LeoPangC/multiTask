@@ -193,42 +193,42 @@ if __name__ == '__main__':
             if batches_done % opt.sample_interval == 0:
                 save_image(output.data[:25], "../images/unet/%d.png" % batches_done, nrow=5)
                 draw_pics(output.data[0], batches_done)
-        # D_train_epochs_loss.append(np.average(D_train_epoch_loss))
-        G_train_epochs_loss.append(np.average(G_train_epoch_loss))
+            # D_train_epochs_loss.append(np.average(D_train_epoch_loss))
+            G_train_epochs_loss.append(np.average(G_train_epoch_loss))
 
-        # =====================valid============================
-        generator.eval()
-        valid_epoch_loss = []
-        for idx, (dataX, dataY) in enumerate(valid_dataloader, 0):
-            dataX = dataX.to(torch.float32).to(opt.device)
-            dataY = dataY.to(torch.float32).to(opt.device)
-            outputs = generator(dataX)
-            loss = criterion(dataY, outputs)
-            valid_epoch_loss.append(loss.item())
-            valid_loss.append(loss.item())
-        valid_epochs_loss.append(np.average(valid_epoch_loss))
+            # =====================valid============================
+            generator.eval()
+            valid_epoch_loss = []
+            for idx, (dataX, dataY) in enumerate(valid_dataloader, 0):
+                dataX = dataX.to(torch.float32).to(opt.device)
+                dataY = dataY.to(torch.float32).to(opt.device)
+                outputs = generator(dataX)
+                loss = criterion(dataY, outputs)
+                valid_epoch_loss.append(loss.item())
+                valid_loss.append(loss.item())
+            valid_epochs_loss.append(np.average(valid_epoch_loss))
 
-        # ====================adjust lr========================
-        # D_lr_adjust = {
-        #     2: 1e-5, 4: 5e-6, 6: 1e-6, 8: 5e-7,
-        #     10: 1e-7, 15: 5e-8, 20: 1e-8
-        # }
-        # G_lr_adjust = {
-        #     2: 5e-5, 4: 1e-5, 6: 5e-6, 8: 1e-6,
-        #     10: 5e-7, 15: 1e-7, 20: 5e-8
-        # }
-        # if epoch in D_lr_adjust.keys():
-        #     lr = D_lr_adjust[epoch]
-        #     for param_group in optimizer_D.param_groups:
-        #         param_group['lr'] = lr
-        # if epoch in G_lr_adjust.keys():
-        #     lr = G_lr_adjust[epoch]
-        #     for param_group in optimizer_G.param_groups:
-        #         param_group['lr'] = lr
-        #     print('Updating learning rate to {}'.format(lr))
-        # torch.save(transformer.state_dict(), './save/gan/wind_u_{}.pth'.format(epoch))
-        torch.save(generator.state_dict(), '../save/unet/unet_{}.pth'.format(epoch))
-        # torch.save(discriminator.state_dict(), '../save/gan/discriminator_u_{}.pth'.format(epoch))
+            # ====================adjust lr========================
+            # D_lr_adjust = {
+            #     2: 1e-5, 4: 5e-6, 6: 1e-6, 8: 5e-7,
+            #     10: 1e-7, 15: 5e-8, 20: 1e-8
+            # }
+            # G_lr_adjust = {
+            #     2: 5e-5, 4: 1e-5, 6: 5e-6, 8: 1e-6,
+            #     10: 5e-7, 15: 1e-7, 20: 5e-8
+            # }
+            # if epoch in D_lr_adjust.keys():
+            #     lr = D_lr_adjust[epoch]
+            #     for param_group in optimizer_D.param_groups:
+            #         param_group['lr'] = lr
+            # if epoch in G_lr_adjust.keys():
+            #     lr = G_lr_adjust[epoch]
+            #     for param_group in optimizer_G.param_groups:
+            #         param_group['lr'] = lr
+            #     print('Updating learning rate to {}'.format(lr))
+            # torch.save(transformer.state_dict(), './save/gan/wind_u_{}.pth'.format(epoch))
+            torch.save(generator.state_dict(), '../save/unet/unet_{}.pth'.format(epoch))
+            # torch.save(discriminator.state_dict(), '../save/gan/discriminator_u_{}.pth'.format(epoch))
 
 
     plt.figure(figsize=(12, 4))
