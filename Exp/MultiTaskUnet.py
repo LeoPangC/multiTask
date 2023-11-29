@@ -8,15 +8,15 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch
 from model.Unet import DownsampleLayer, UpSampleLayer
-from DataProcess import WindSet, GetWindSet
+from DataProcess import GetWindSet
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
-from draw import draw_pics
+# from draw import draw_pics
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=200, help="number of epochs of training")
-parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
 parser.add_argument("--D_lr", type=float, default=0.0001, help="adam: learning rate")
 parser.add_argument("--G_lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
@@ -150,15 +150,13 @@ if __name__ == '__main__':
     # 进行多个epoch的训练
     era5u_path = 'era5u_train.npy'
     gfsu_path = 'gfsu_train.npy'
-    # wind_train = WindSet(gfs_path=gfs_path, era5_path=era5u_path)
-    # u10_train_dataloader = DataLoader(wind_train, batch_size=64, shuffle=False, drop_last=False)
     era5v_path = 'era5v_train.npy'
     gfsv_path = 'gfsv_train.npy'
     path = '/media/upc/ECEA553BEA5502EE/code/multiTask/Dataset'
-    gfsu_data = np.load(os.path.join(path, gfsu_path))
-    era5u_data = np.load(os.path.join(path, era5u_path))
-    gfsv_data = np.load(os.path.join(path, gfsv_path))
-    era5v_data = np.load(os.path.join(path, era5v_path))
+    gfsu_data = np.load(os.path.join(path, gfsu_path))[:, :96, :96]
+    era5u_data = np.load(os.path.join(path, era5u_path))[:, :96, :96]
+    gfsv_data = np.load(os.path.join(path, gfsv_path))[:, :96, :96]
+    era5v_data = np.load(os.path.join(path, era5v_path))[:, :96, :96]
 
     deg = 180.0 / np.pi
     era5_speed = np.sqrt(era5u_data ** 2 + era5v_data ** 2)
@@ -172,17 +170,21 @@ if __name__ == '__main__':
     era5_dir = era5_dir / 360.0
     gfs_dir = gfs_dir / 360.0
     wind_train = GetWindSet(gfs_data_1=gfs_speed[:9000], era5_data_1=era5_speed[:9000], gfs_data_2=gfs_dir[:9000], era5_data_2=era5_dir[:9000])
-    train_dataloader = DataLoader(wind_train, batch_size=64, shuffle=False, drop_last=False)
+    train_dataloader = DataLoader(wind_train, batch_size=opt.batch_size, shuffle=False, drop_last=False, num_workers=2)
     wind_valid = GetWindSet(gfs_data_1=gfs_speed[9000: 500], era5_data_1=era5_speed[9000: 500], gfs_data_2=gfs_dir[9000: 500], era5_data_2=era5_dir[9000: 500])
-    valid_dataloader = DataLoader(wind_valid, batch_size=64, shuffle=False, drop_last=False)
+    valid_dataloader = DataLoader(wind_valid, batch_size=opt.batch_size, shuffle=False, drop_last=False)
+    # wind_train = GetWindSet(gfs_data_1=gfsu_data[:9000], era5_data_1=era5u_data[:9000], gfs_data_2=gfsv_data[:9000], era5_data_2=era5v_data[:9000])
+    # train_dataloader = DataLoader(wind_train, batch_size=64, shuffle=False, drop_last=False)
+    # wind_valid = GetWindSet(gfs_data_1=gfsu_data[9000: 500], era5_data_1=era5u_data[9000: 500], gfs_data_2=gfsv_data[9000: 500], era5_data_2=era5v_data[9000: 500])
+    # valid_dataloader = DataLoader(wind_valid, batch_size=64, shuffle=False, drop_last=False)
 
     for epoch in range(opt.n_epochs):  # epoch:50
-
         generator.train()
         # discriminator.train()
         # D_train_epoch_loss = []
         G_train_epoch_loss = []
         for i, (dataX, dataY) in enumerate(train_dataloader):  # dataX:(64, 1, 180, 180) dataY:(64, 1, 180, 180)
+            # print(dataX.shape)
             dataX = dataX.to(torch.float32).to(opt.device)
             dataY = dataY.to(torch.float32).to(opt.device)
 
@@ -206,16 +208,16 @@ if __name__ == '__main__':
             G_train_epochs_loss.append(np.average(G_train_epoch_loss))
 
             # =====================valid============================
-            generator.eval()
-            valid_epoch_loss = []
-            for idx, (dataX, dataY) in enumerate(valid_dataloader, 0):
-                dataX = dataX.to(torch.float32).to(opt.device)
-                dataY = dataY.to(torch.float32).to(opt.device)
-                outputs = generator(dataX)
-                loss = criterion(dataY, outputs)
-                valid_epoch_loss.append(loss.item())
-                valid_loss.append(loss.item())
-            valid_epochs_loss.append(np.average(valid_epoch_loss))
+            # generator.eval()
+            # valid_epoch_loss = []
+            # for idx, (dataX, dataY) in enumerate(valid_dataloader, 0):
+            #     dataX = dataX.to(torch.float32).to(opt.device)
+            #     dataY = dataY.to(torch.float32).to(opt.device)
+            #     outputs = generator(dataX)
+            #     loss = criterion(dataY, outputs)
+            #     valid_epoch_loss.append(loss.item())
+            #     valid_loss.append(loss.item())
+            # valid_epochs_loss.append(np.average(valid_epoch_loss))
 
             # ====================adjust lr========================
             # D_lr_adjust = {

@@ -6,14 +6,15 @@ from draw import draw_pics
 
 device, = [torch.device("cuda:0" if torch.cuda.is_available() else "cpu")]
 # 模型加载
-model = Generator().to(device)
+model = Generator()
 model.load_state_dict(torch.load('../save/unet/unet_199.pth'))
+model.to(device)
 model.eval()
 model.cuda()
 
 # 数据读取
-left = 2000
-right = 2200
+left = 9700
+right = 9900
 gfs_u10_input = np.load('../Dataset/u10_gfs.npy')[left:right, :96, :96]
 gfs_v10_input = np.load('../Dataset/v10_gfs.npy')[left:right, :96, :96]
 era5_u10_label = np.load('../Dataset/u10_era5.npy')[left:right, :96, :96]
@@ -57,7 +58,7 @@ with torch.no_grad():
     gfs_input = torch.tensor(gfs_input)
     gfs_input = gfs_input.to(device)
     predict_result = model(gfs_input)
-predict_result = predict_result.cpu().numpy()
+    predict_result = predict_result.cpu().numpy()
 
 # u10 = predict_result[:, :1]
 # v10 = predict_result[:, 1:]

@@ -23,11 +23,11 @@ parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first 
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--n_cpu", type=int, default=2, help="number of cpu threads to use during batch generation")
 parser.add_argument("--dim", type=int, default=1024, help="dimensionality of the latent space")
-parser.add_argument("--img_size", type=int, default=180, help="size of each image dimension")
+parser.add_argument("--img_size", type=int, default=96, help="size of each image dimension")
 parser.add_argument("--channels", type=int, default=1, help="number of image channels")
 parser.add_argument("--sample_interval", type=int, default=500, help="interval betwen image samples")
 parser.add_argument("--heads", type=int, default=8)
-parser.add_argument("--patch_size", type=int, default=30)
+parser.add_argument("--patch_size", type=int, default=8)
 parser.add_argument("--mlp_dim", type=int, default=2048)
 parser.add_argument("--dim_head", type=int, default=64)
 parser.add_argument("--D_depth", type=int, default=2)
@@ -148,8 +148,8 @@ wind_train = WindSet(gfs_path=gfs_path, era5_path=era5u_path)
 u10_train_dataloader = DataLoader(wind_train, batch_size=64, shuffle=False, drop_last=False)
 era5u_path = 'era5u_test.npy'
 gfs_path = 'gfsu_test.npy'
-wind_valid = WindSet(gfs_path=gfs_path, era5_path=era5u_path)
-u10_valid_dataloader = DataLoader(wind_valid, batch_size=64, shuffle=False, drop_last=False)
+# wind_valid = WindSet(gfs_path=gfs_path, era5_path=era5u_path)
+# u10_valid_dataloader = DataLoader(wind_valid, batch_size=64, shuffle=False, drop_last=False)
 era5_max = 33.646434819152795
 era5_min = -33.950101286059635
 gfs_max = 51.68731
