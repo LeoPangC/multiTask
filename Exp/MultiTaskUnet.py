@@ -131,11 +131,8 @@ if __name__ == '__main__':
     # optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.D_lr, betas=(opt.b1, opt.b2))
 
     if torch.cuda.is_available():
-        # transformer = transformer.cuda()
         generator = generator.cuda()
-        # discriminator = discriminator.cuda()
         criterion = criterion.cuda()
-        # criterion_b = criterion_b.cuda()
 
 
     train_loss = []
