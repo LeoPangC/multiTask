@@ -38,10 +38,10 @@ era5_dir = era5_dir / 360.0
 gfs_dir = gfs_dir / 360.0
 
 # 数据拼接
-# gfs_input = np.concatenate((gfs_u10_input, gfs_v10_input), axis=1)
-# era5_label = np.concatenate((era5_u10_label, era5_v10_label), axis=1)
-gfs_input = np.concatenate((gfs_speed, gfs_dir), axis=1)
-era5_label = np.concatenate((era5_speed, era5_dir), axis=1)
+gfs_input = np.concatenate((gfs_u10_input, gfs_v10_input), axis=1)
+era5_label = np.concatenate((era5_u10_label, era5_v10_label), axis=1)
+# gfs_input = np.concatenate((gfs_speed, gfs_dir), axis=1)
+# era5_label = np.concatenate((era5_speed, era5_dir), axis=1)
 
 # 计算初始RMSE
 b, _, h, w = gfs_u10_input.shape
@@ -60,14 +60,14 @@ with torch.no_grad():
     predict_result = model(gfs_input)
     predict_result = predict_result.cpu().numpy()
 
-# u10 = predict_result[:, :1]
-# v10 = predict_result[:, 1:]
+u10 = predict_result[:, :1]
+v10 = predict_result[:, 1:]
 # 返归一化
 predict_speed = predict_result[:, :1] * s_max
 predict_dir = predict_result[:, 1:] * 360.0
 rad = np.pi/180.0
-u10 = -predict_speed * np.sin(predict_dir * rad)
-v10 = -predict_speed * np.cos(predict_dir * rad)
+# u10 = -predict_speed * np.sin(predict_dir * rad)
+# v10 = -predict_speed * np.cos(predict_dir * rad)
 
 u10_rmse_predict = np.sqrt(np.sum((u10-era5_u10_label)**2)/(b*h*w))
 print('u10的订正RMSE是：', u10_rmse_predict)
