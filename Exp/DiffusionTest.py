@@ -126,8 +126,8 @@ if __name__ == '__main__':
                 print("epoch={}/{},{}/{}of train, loss={}".format(
                     epoch, opt.n_epochs, i, len(train_dataloader), loss.item()))
 
-            if epoch // 10 == 0:
-                state_dict = netG.state_dict()
-                for key, param in state_dict.items():
-                    state_dict[key] = param.cpu()
-                    torch.save(state_dict, '../save/diffusion/diffusion_{}'.format(epoch))
+        if epoch % 10 == 0 and epoch >= 10:
+            state_dict = netG.state_dict()
+            for key, param in state_dict.items():
+                state_dict[key] = param.cpu()
+            torch.save(state_dict, '../save/diffusion/diffusion_{}'.format(epoch))
