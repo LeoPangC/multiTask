@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from inspect import isfunction
 from functools import partial
 import numpy as np
+from torchvision.utils import save_image
 
 
 def exists(x):
@@ -193,42 +194,58 @@ class GaussianDiffusion(nn.Module):
             img = self.p_sample(img, torch.full(
                 (b,), i, device=device, dtype=torch.long), condition_x=x)
             if i % sample_inter == 0:
+                # save_image(img.data[:4], '/home/hy4080/PycharmProjects/multiTask/images/diff_i3000/process_%d.png' % i,
+                #            nrow=2)
                 ret_img = torch.cat([ret_img, img], dim=0)
 
-        if continous:
-            return ret_img
-        else:
-            return ret_img[-1]
+        return img
+        # if continous:
+        #     return ret_img
+        # else:
+        #     return ret_img[-1]
 
-    def q_sample(self, x_start, continuous_sqrt_alpha_cumprod, noise=None):
+    # def q_sample(self, x_start, continuous_sqrt_alpha_cumprod, noise=None):
+    #     noise = default(noise, lambda: torch.randn_like(x_start))
+    #
+    #     # random gama
+    #     return (
+    #         continuous_sqrt_alpha_cumprod * x_start +
+    #         (1 - continuous_sqrt_alpha_cumprod**2).sqrt() * noise
+    #     )
+    def q_sample(self, x_start, t, noise=None):
         noise = default(noise, lambda: torch.randn_like(x_start))
 
         # random gama
         return (
-            continuous_sqrt_alpha_cumprod * x_start +
-            (1 - continuous_sqrt_alpha_cumprod**2).sqrt() * noise
+            extract(self.sqrt_alphas_cumprod, t, x_start.shape) * x_start +
+            extract(self.sqrt_one_minus_alphas_cumprod, t, x_start.shape) * noise
         )
 
     def forward(self, dataX, dataY, noise=None):
         b, _, _, _ = dataY.shape
-        t = np.random.randint(1, self.num_timesteps + 1)
-        continuous_sqrt_alpha_cumprod = torch.FloatTensor(
-            np.random.uniform(
-                self.sqrt_alphas_cumprod_prev[t-1],
-                self.sqrt_alphas_cumprod_prev[t],
-                size=b
-            )
-        ).to(self.device)
-        continuous_sqrt_alpha_cumprod = continuous_sqrt_alpha_cumprod.view(b, -1)
+        # t = np.random.randint(1, self.num_timesteps + 1)
+        t = torch.randint(0, self.num_timesteps, (b,), device=dataX.device).long()
         noise = default(noise, lambda: torch.randn_like(dataY))
-        x_noise = self.q_sample(dataY, continuous_sqrt_alpha_cumprod.view(-1, 1, 1, 1), noise)
+        x_noise = self.q_sample(dataY, t, noise)
+        # continuous_sqrt_alpha_cumprod = torch.FloatTensor(
+        #     np.random.uniform(
+        #         self.sqrt_alphas_cumprod_prev[t-1],
+        #         self.sqrt_alphas_cumprod_prev[t],
+        #         size=b
+        #     )
+        # ).to(self.device)
+        # continuous_sqrt_alpha_cumprod = continuous_sqrt_alpha_cumprod.view(b, -1)
+        # noise = default(noise, lambda: torch.randn_like(dataY))
+        # x_noise = self.q_sample(dataY, continuous_sqrt_alpha_cumprod.view(-1, 1, 1, 1), noise)
+        # continuous_sqrt_alpha_cumprod = continuous_sqrt_alpha_cumprod.to(torch.float32)
 
-        continuous_sqrt_alpha_cumprod = continuous_sqrt_alpha_cumprod.to(torch.float32)
-        if not self.conditional:
-            x_recon = self.denoise_fn(x_noise, continuous_sqrt_alpha_cumprod)
-        else:
-            x = torch.cat([dataX, x_noise], dim=1).to(torch.float32)
-            x_recon = self.denoise_fn(x, continuous_sqrt_alpha_cumprod)
+        # if not self.conditional:
+        #     x_recon = self.denoise_fn(x_noise, continuous_sqrt_alpha_cumprod)
+        # else:
+        # x = torch.cat([dataX, x_noise], dim=1).to(torch.float32)
+        # x_recon = self.denoise_fn(x, continuous_sqrt_alpha_cumprod)
+        x = torch.cat([dataX, x_noise], dim=1).to(torch.float32)
+        x_recon = self.denoise_fn(x, t)
 
         loss = self.loss_func(noise, x_recon)
         return loss

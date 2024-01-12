@@ -1,4 +1,5 @@
 import torch
+import os
 import numpy as np
 from MultiTaskUnet import Generator
 from draw import draw_pics
@@ -13,8 +14,8 @@ model.eval()
 model.cuda()
 
 # 数据读取
-left = 9700
-right = 9900
+left = 9000
+right = 9100
 gfs_u10_input = np.load('../Dataset/u10_gfs.npy')[left:right, :96, :96]
 gfs_v10_input = np.load('../Dataset/v10_gfs.npy')[left:right, :96, :96]
 era5_u10_label = np.load('../Dataset/u10_era5.npy')[left:right, :96, :96]
@@ -59,6 +60,9 @@ with torch.no_grad():
     gfs_input = gfs_input.to(device)
     predict_result = model(gfs_input)
     predict_result = predict_result.cpu().numpy()
+
+save_image(img.data[:4], os.path.join(image_path, 'bc_%d.png' % (i * opt.batch_size)), nrow=2, normalize=True)
+save_image(dataY.data[:4], os.path.join(image_path, 'gt_%d.png' % (i * opt.batch_size)), nrow=2, normalize=True)
 
 u10 = predict_result[:, :1]
 v10 = predict_result[:, 1:]
