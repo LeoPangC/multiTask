@@ -8,25 +8,26 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch
 from torch.nn import init
-from model.diffusion.diffusion import GaussianDiffusion
-from model.diffusion.unet import UNet
+from model.sr3_modules.diffusion import GaussianDiffusion
+from model.sr3_modules.unet import UNet
 from DataProcess import GetWindSet
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
+import torchvision.transforms.functional as F
 # from draw import draw_pics
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=8, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0001, help="adam: learning rate")
 parser.add_argument("--b", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--n_cpu", type=int, default=2, help="number of cpu threads to use during batch generation")
 parser.add_argument("--dim", type=int, default=1024, help="dimensionality of the latent space")
 parser.add_argument("--image_size", type=int, default=96, help="size of each image dimension")
 parser.add_argument("--channels", type=int, default=2, help="number of image channels")
-parser.add_argument("--schedule", type=str, default='linear')
-parser.add_argument("--linear_start", type=float, default=1e-6)
-parser.add_argument("--linear_end", type=float, default=1e-2)
+parser.add_argument("--linear_start", type=float, default=2e-6)
+# 上次区间值为 1e-2-1e-6
+parser.add_argument("--linear_end", type=float, default=2e-2)
 parser.add_argument("--conditional", type=bool, default=True)
 parser.add_argument("--n_iter", type=int, default=1000000)
 
@@ -42,9 +43,10 @@ parser.add_argument("--with_time_emb", type=bool, default=True)
 parser.add_argument("--dropout", type=float, default=0.)
 parser.add_argument("--device", type=str, default="cpu")
 
+parser.add_argument("--schedule", type=str, default='linear')
 parser.add_argument("--n_epochs", type=int, default=400, help="number of epochs of training")
-parser.add_argument("--mode", type=str, default='test', help="[train, test]")
-parser.add_argument("--n_timestep", type=int, default=2000)
+parser.add_argument("--mode", type=str, default='train', help="[train, test]")
+parser.add_argument("--n_timestep", type=int, default=4000)
 parser.add_argument("--file", type=str, default='diff_i2000')
 opt = parser.parse_args()
 # 设置cuda:(cuda:0)
@@ -77,7 +79,8 @@ netG = GaussianDiffusion(
 )
 
 if __name__ == '__main__':
-    opt.file = 'diff_i{}_e{}'.format(opt.n_timestep, opt.n_epochs)
+    opt.file = 'diff_i{}_e{}_{}_{}'.format(opt.n_timestep, opt.n_epochs, opt.linear_start, opt.linear_end)
+    # opt.file = 'diff_i{}_e{}'.format(opt.n_timestep, opt.n_epochs)
     path = '/home/hy4080/PycharmProjects/multiTask'
     image_path = os.path.join(path, 'images', opt.file)
     save_path = os.path.join(path, 'save', opt.file)
@@ -137,9 +140,15 @@ if __name__ == '__main__':
             for i, (dataX, dataY) in enumerate(train_dataloader):
                 dataX = dataX.to(torch.float32).to(opt.device)
                 dataY = dataY.to(torch.float32).to(opt.device)
+                lr = F.resize(dataX, [24, 24])
+                sr = F.resize(lr, [96, 96])
+                sr = sr.to(torch.float32).to(opt.device)
+                # bias = dataY - dataX
+                # bias = bias.to(torch.float32).to(opt.device)
 
-                loss = netG(dataX, dataY)
-                b, c, h, w = dataX.shape
+                # loss = netG(dataX, bias)
+                loss = netG(sr, dataY)
+                b, c, h, w = sr.shape
                 loss = loss.sum() / (b*c*h*w)
                 optimizer.zero_grad()  # 梯度归0
                 loss.backward()  # 进行反向传播
@@ -177,23 +186,60 @@ if __name__ == '__main__':
         print('test beginning')
         for i, (dataX, dataY) in enumerate(test_dataloader):
             b, c, h, w = dataX.shape
-            dataX = dataX.to(torch.float32).to(opt.device)
-            dataY = dataY.to(torch.float32).to(opt.device)
-            netG.load_state_dict(torch.load(os.path.join(save_path, 'diffusion_{}'.format(opt.n_epochs-1))))
+            dataX = dataX.to(torch.float32)
+            dataY = dataY.to(torch.float32)
+            lr = F.resize(dataX, [24, 24])
+            # lr_c = F.center_crop(lr, [24, 24])
+            # hr = F.resize(dataX[:4], [96, 96])
+            # hr_c = F.center_crop(hr, [96, 96])
+            sr = F.resize(lr, [96, 96])
+            sr = sr.to(torch.float32).to(opt.device)
+            # sr_c = F.center_crop(sr, [96, 96])
+            # save_image(lr.data[:4], os.path.join(image_path, 'lr_%d.png' % (i * opt.batch_size)), nrow=2,
+            #            normalize=True)
+            # save_image(lr_c.data[:4], os.path.join(image_path, 'lr_c_%d.png' % (i * opt.batch_size)), nrow=2,
+            #            normalize=True)
+            # save_image(hr.data[:4], os.path.join(image_path, 'hr_%d.png' % (i * opt.batch_size)), nrow=2,
+            #            normalize=True)
+            # save_image(hr_c.data[:4], os.path.join(image_path, 'hr_c_%d.png' % (i * opt.batch_size)), nrow=2,
+            #            normalize=True)
+            # save_image(sr.data[:4], os.path.join(image_path, 'sr_%d.png' % (i * opt.batch_size)), nrow=2,
+            #            normalize=True)
+            # save_image(sr_c.data[:4], os.path.join(image_path, 'sr_c_%d.png' % (i * opt.batch_size)), nrow=2,
+            #            normalize=True)
+            # netG.load_state_dict(torch.load(os.path.join(save_path, 'diffusion_{}'.format(opt.n_epochs-1))))
             netG.eval()
             with torch.no_grad():
                 print('第{}次测试'.format(i+1))
-                img = netG.p_sample_loop(dataX, continous=True)
+                # img = netG.p_sample_loop(dataX, continous=True)
+                img = netG.p_sample_loop(sr, continous=True)
 
+            # bc_result = dataX + img
+            bc_result = img
             origin = dataX.cpu().numpy()
-            predict_result = img.cpu().numpy()
+            predict_result = bc_result.cpu().numpy()
             label = dataY.cpu().numpy()
-            print('u10 rmse:', np.sqrt(np.sum((origin[:, 0]-label[:, 0])**2)/(b*h*w)))
-            print('v10 rmse:', np.sqrt(np.sum((origin[:, 1]-label[:, 1])**2)/(b*h*w)))
-            print('u10 bc rmse:', np.sqrt(np.sum((predict_result[:, 0]-label[:, 0])**2)/(b*h*w)))
-            print('v10 bc rmse:', np.sqrt(np.sum((predict_result[:, 1]-label[:, 1])**2)/(b*h*w)))
+            ori_rmse = np.sqrt(np.sum((origin-label)**2)/(b*c*h*w))
+            bc_rmse = np.sqrt(np.sum((predict_result-label)**2)/(b*c*h*w))
+            u10_rmse = np.sqrt(np.sum((origin[:, 0]-label[:, 0])**2)/(b*h*w))
+            v10_rmse = np.sqrt(np.sum((origin[:, 1]-label[:, 1])**2)/(b*h*w))
+            u10_bc_rmse = np.sqrt(np.sum((predict_result[:, 0]-label[:, 0])**2)/(b*h*w))
+            v10_bc_rmse = np.sqrt(np.sum((predict_result[:, 1]-label[:, 1])**2)/(b*h*w))
+            print('u10 rmse:', u10_rmse)
+            print('v10 rmse:', v10_rmse)
+            print('origin rmse:', ori_rmse)
+            print('u10 bc rmse:', u10_bc_rmse)
+            print('v10 bc rmse:', v10_bc_rmse)
+            print('bc rmse:', bc_rmse)
+            print('u10:', (u10_rmse - u10_bc_rmse)/u10_rmse)
+            print('v10:', (v10_rmse - v10_bc_rmse)/v10_rmse)
+            print('result:', (ori_rmse - bc_rmse)/ori_rmse)
 
             save_image(dataX.data[:4], os.path.join(image_path, 'gfs_%d.png' % (i * opt.batch_size)), nrow=2,
                        normalize=True)
-            save_image(img.data[:4], os.path.join(image_path, 'bc_%d.png' % (i * opt.batch_size)), nrow=2, normalize=True)
+            save_image(bc_result.data[:4], os.path.join(image_path, 'bc_%d.png' % (i * opt.batch_size)), nrow=2, normalize=True)
             save_image(dataY.data[:4], os.path.join(image_path, 'gt_%d.png' % (i * opt.batch_size)), nrow=2, normalize=True)
+            save_image((dataY - bc_result).data[:4], os.path.join(image_path, 'gt-bc_%d.png' % (i * opt.batch_size)), nrow=2,
+                       normalize=True)
+            save_image((dataY - bc_result).data[:4], os.path.join(image_path, 'gt-gfs_%d.png' % (i * opt.batch_size)), nrow=2,
+                       normalize=True)
