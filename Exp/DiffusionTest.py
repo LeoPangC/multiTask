@@ -18,7 +18,7 @@ import torchvision.transforms.functional as F
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", type=int, default=8, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0001, help="adam: learning rate")
 parser.add_argument("--b", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--n_cpu", type=int, default=2, help="number of cpu threads to use during batch generation")
@@ -63,6 +63,7 @@ model = UNet(
     dropout=opt.dropout,
     image_size=opt.image_size
 )
+
 netG = GaussianDiffusion(
     model,
     image_size=opt.image_size,
@@ -140,15 +141,15 @@ if __name__ == '__main__':
             for i, (dataX, dataY) in enumerate(train_dataloader):
                 dataX = dataX.to(torch.float32).to(opt.device)
                 dataY = dataY.to(torch.float32).to(opt.device)
-                lr = F.resize(dataX, [24, 24])
-                sr = F.resize(lr, [96, 96])
-                sr = sr.to(torch.float32).to(opt.device)
+                # lr = F.resize(dataX, [24, 24])
+                # sr = F.resize(lr, [96, 96])
+                # sr = sr.to(torch.float32).to(opt.device)
                 # bias = dataY - dataX
                 # bias = bias.to(torch.float32).to(opt.device)
 
                 # loss = netG(dataX, bias)
-                loss = netG(sr, dataY)
-                b, c, h, w = sr.shape
+                loss = netG(dataX, dataY)
+                b, c, h, w = dataX.shape
                 loss = loss.sum() / (b*c*h*w)
                 optimizer.zero_grad()  # 梯度归0
                 loss.backward()  # 进行反向传播
@@ -186,14 +187,14 @@ if __name__ == '__main__':
         print('test beginning')
         for i, (dataX, dataY) in enumerate(test_dataloader):
             b, c, h, w = dataX.shape
-            dataX = dataX.to(torch.float32)
-            dataY = dataY.to(torch.float32)
-            lr = F.resize(dataX, [24, 24])
+            dataX = dataX.to(torch.float32).to(opt.device)
+            dataY = dataY.to(torch.float32).to(opt.device)
+            # lr = F.resize(dataX, [24, 24])
             # lr_c = F.center_crop(lr, [24, 24])
             # hr = F.resize(dataX[:4], [96, 96])
             # hr_c = F.center_crop(hr, [96, 96])
-            sr = F.resize(lr, [96, 96])
-            sr = sr.to(torch.float32).to(opt.device)
+            # sr = F.resize(lr, [96, 96])
+            # sr = sr.to(torch.float32).to(opt.device)
             # sr_c = F.center_crop(sr, [96, 96])
             # save_image(lr.data[:4], os.path.join(image_path, 'lr_%d.png' % (i * opt.batch_size)), nrow=2,
             #            normalize=True)
@@ -211,8 +212,7 @@ if __name__ == '__main__':
             netG.eval()
             with torch.no_grad():
                 print('第{}次测试'.format(i+1))
-                # img = netG.p_sample_loop(dataX, continous=True)
-                img = netG.p_sample_loop(sr, continous=True)
+                img = netG.p_sample_loop(dataX, continous=True)
 
             # bc_result = dataX + img
             bc_result = img

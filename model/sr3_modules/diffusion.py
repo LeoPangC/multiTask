@@ -6,6 +6,8 @@ from inspect import isfunction
 from functools import partial
 import numpy as np
 from tqdm import tqdm
+from torchvision.utils import save_image
+import os
 
 
 def _warmup_beta(linear_start, linear_end, n_timestep, warmup_frac):
@@ -69,7 +71,8 @@ class GaussianDiffusion(nn.Module):
         channels=3,
         loss_type='l1',
         conditional=True,
-        schedule_opt=None
+        schedule_opt=None,
+        device=None
     ):
         super().__init__()
         self.channels = channels
@@ -77,9 +80,11 @@ class GaussianDiffusion(nn.Module):
         self.denoise_fn = denoise_fn
         self.loss_type = loss_type
         self.conditional = conditional
+        self.device = device
+
+        self.set_loss(self.device)
         if schedule_opt is not None:
-            pass
-            # self.set_new_noise_schedule(schedule_opt)
+            self.set_new_noise_schedule(schedule_opt, self.device)
 
     def set_loss(self, device):
         if self.loss_type == 'l1':
@@ -193,11 +198,14 @@ class GaussianDiffusion(nn.Module):
             for i in tqdm(reversed(range(0, self.num_timesteps)), desc='sampling loop time step', total=self.num_timesteps):
                 img = self.p_sample(img, i, condition_x=x)
                 if i % sample_inter == 0:
-                    ret_img = torch.cat([ret_img, img], dim=0)
-        if continous:
-            return ret_img
-        else:
-            return ret_img[-1]
+                    # ret_img = torch.cat([ret_img, img], dim=0)
+                    save_image(img.data[:4], os.path.join('/home/hy4080/PycharmProjects/multiTask/images/process', 'process_%d.png' % (i)), nrow=2,
+                               normalize=True)
+        # if continous:
+        #     return ret_img
+        # else:
+        #     return ret_img[-1]
+        return img
 
     @torch.no_grad()
     def sample(self, batch_size=1, continous=False):
@@ -218,9 +226,9 @@ class GaussianDiffusion(nn.Module):
             (1 - continuous_sqrt_alpha_cumprod**2).sqrt() * noise
         )
 
-    def p_losses(self, x_in, noise=None):
-        x_start = x_in['HR']
-        [b, c, h, w] = x_start.shape
+    def forward(self, dataX, dataY, noise=None):
+        # HR 就是dataY
+        [b, c, h, w] = dataY.shape
         t = np.random.randint(1, self.num_timesteps + 1)
         continuous_sqrt_alpha_cumprod = torch.FloatTensor(
             np.random.uniform(
@@ -228,22 +236,19 @@ class GaussianDiffusion(nn.Module):
                 self.sqrt_alphas_cumprod_prev[t],
                 size=b
             )
-        ).to(x_start.device)
+        ).to(dataY.device)
         continuous_sqrt_alpha_cumprod = continuous_sqrt_alpha_cumprod.view(
             b, -1)
 
-        noise = default(noise, lambda: torch.randn_like(x_start))
+        noise = default(noise, lambda: torch.randn_like(dataY))
         x_noisy = self.q_sample(
-            x_start=x_start, continuous_sqrt_alpha_cumprod=continuous_sqrt_alpha_cumprod.view(-1, 1, 1, 1), noise=noise)
+            x_start=dataY, continuous_sqrt_alpha_cumprod=continuous_sqrt_alpha_cumprod.view(-1, 1, 1, 1), noise=noise)
 
         if not self.conditional:
             x_recon = self.denoise_fn(x_noisy, continuous_sqrt_alpha_cumprod)
         else:
             x_recon = self.denoise_fn(
-                torch.cat([x_in['SR'], x_noisy], dim=1), continuous_sqrt_alpha_cumprod)
+                torch.cat([dataX, x_noisy], dim=1), continuous_sqrt_alpha_cumprod)
 
         loss = self.loss_func(noise, x_recon)
         return loss
-
-    def forward(self, x, *args, **kwargs):
-        return self.p_losses(x, *args, **kwargs)
