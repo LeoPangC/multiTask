@@ -8,8 +8,8 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch
 from torch.nn import init
-from model.sr3_modules.diffusion import GaussianDiffusion
-from model.sr3_modules.unet import UNet
+from model.diffusion.diffusion import GaussianDiffusion
+from model.diffusion.unet import UNet
 from DataProcess import GetWindSet
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
@@ -25,7 +25,7 @@ parser.add_argument("--n_cpu", type=int, default=2, help="number of cpu threads 
 parser.add_argument("--dim", type=int, default=1024, help="dimensionality of the latent space")
 parser.add_argument("--image_size", type=int, default=96, help="size of each image dimension")
 parser.add_argument("--channels", type=int, default=2, help="number of image channels")
-parser.add_argument("--linear_start", type=float, default=2e-6)
+parser.add_argument("--linear_start", type=float, default=1e-6)
 # 上次区间值为 1e-2-1e-6
 parser.add_argument("--linear_end", type=float, default=2e-2)
 parser.add_argument("--conditional", type=bool, default=True)
@@ -148,6 +148,7 @@ if __name__ == '__main__':
                 # bias = bias.to(torch.float32).to(opt.device)
 
                 # loss = netG(dataX, bias)
+                # loss = netG(dataX, dataY)
                 loss = netG(dataX, dataY)
                 b, c, h, w = dataX.shape
                 loss = loss.sum() / (b*c*h*w)
@@ -212,7 +213,9 @@ if __name__ == '__main__':
             netG.eval()
             with torch.no_grad():
                 print('第{}次测试'.format(i+1))
+                # img = netG.p_sample_loop(dataX, continous=True)
                 img = netG.p_sample_loop(dataX, continous=True)
+
 
             # bc_result = dataX + img
             bc_result = img
@@ -241,5 +244,5 @@ if __name__ == '__main__':
             save_image(dataY.data[:4], os.path.join(image_path, 'gt_%d.png' % (i * opt.batch_size)), nrow=2, normalize=True)
             save_image((dataY - bc_result).data[:4], os.path.join(image_path, 'gt-bc_%d.png' % (i * opt.batch_size)), nrow=2,
                        normalize=True)
-            save_image((dataY - bc_result).data[:4], os.path.join(image_path, 'gt-gfs_%d.png' % (i * opt.batch_size)), nrow=2,
+            save_image((dataY - dataX).data[:4], os.path.join(image_path, 'gt-gfs_%d.png' % (i * opt.batch_size)), nrow=2,
                        normalize=True)
