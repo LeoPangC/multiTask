@@ -148,7 +148,6 @@ if __name__ == '__main__':
                 # bias = bias.to(torch.float32).to(opt.device)
 
                 # loss = netG(dataX, bias)
-                # loss = netG(dataX, dataY)
                 loss = netG(dataX, dataY)
                 b, c, h, w = dataX.shape
                 loss = loss.sum() / (b*c*h*w)
