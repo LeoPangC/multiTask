@@ -12,6 +12,7 @@ from model.diffusion.diffusion import GaussianDiffusion
 from model.diffusion.unet import UNet
 from DataProcess import GetWindSet
 from torch.utils.data import DataLoader
+import torchvision.transforms.functional as F
 import matplotlib.pyplot as plt
 # from draw import draw_pics
 
@@ -42,9 +43,9 @@ parser.add_argument("--with_time_emb", type=bool, default=True)
 parser.add_argument("--dropout", type=float, default=0.)
 parser.add_argument("--device", type=str, default="cpu")
 
-parser.add_argument("--n_epochs", type=int, default=400, help="number of epochs of training")
+parser.add_argument("--n_epochs", type=int, default=600, help="number of epochs of training")
 parser.add_argument("--mode", type=str, default='test', help="[train, test]")
-parser.add_argument("--n_timestep", type=int, default=2000)
+parser.add_argument("--n_timestep", type=int, default=4000)
 parser.add_argument("--file", type=str, default='diff_i2000')
 opt = parser.parse_args()
 # 设置cuda:(cuda:0)
@@ -137,8 +138,14 @@ if __name__ == '__main__':
             for i, (dataX, dataY) in enumerate(train_dataloader):
                 dataX = dataX.to(torch.float32).to(opt.device)
                 dataY = dataY.to(torch.float32).to(opt.device)
+                lr = F.resize(dataX, [24, 24])
+                sr = F.resize(lr, [96, 96])
+                sr = sr.to(torch.float32).to(opt.device)
+                # bias = dataY - dataX
+                # bias = bias.to(torch.float32).to(opt.device)
 
-                loss = netG(dataX, dataY)
+                # loss = netG(dataX, dataY)
+                loss = netG(sr, dataY)
                 b, c, h, w = dataX.shape
                 loss = loss.sum() / (b*c*h*w)
                 optimizer.zero_grad()  # 梯度归0
@@ -179,11 +186,15 @@ if __name__ == '__main__':
             b, c, h, w = dataX.shape
             dataX = dataX.to(torch.float32).to(opt.device)
             dataY = dataY.to(torch.float32).to(opt.device)
+            lr = F.resize(dataX, [24, 24])
+            sr = F.resize(lr, [96, 96])
+            sr = sr.to(torch.float32).to(opt.device)
             netG.load_state_dict(torch.load(os.path.join(save_path, 'diffusion_{}'.format(opt.n_epochs-1))))
             netG.eval()
             with torch.no_grad():
                 print('第{}次测试'.format(i+1))
-                img = netG.p_sample_loop(dataX, continous=True)
+                # img = netG.p_sample_loop(dataX, continous=True)
+                img = netG.p_sample_loop(sr, continous=True)
 
             origin = dataX.cpu().numpy()
             predict_result = img.cpu().numpy()

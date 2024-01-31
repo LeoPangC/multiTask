@@ -194,9 +194,9 @@ class GaussianDiffusion(nn.Module):
             img = self.p_sample(img, torch.full(
                 (b,), i, device=device, dtype=torch.long), condition_x=x)
             if i % sample_inter == 0:
-                # save_image(img.data[:4], '/home/hy4080/PycharmProjects/multiTask/images/diff_i3000/process_%d.png' % i,
-                #            nrow=2)
-                ret_img = torch.cat([ret_img, img], dim=0)
+                save_image(img.data[:4], '/home/hy4080/PycharmProjects/multiTask/images/process/process_%d.png' % i,
+                           nrow=2)
+                # ret_img = torch.cat([ret_img, img], dim=0)
 
         return img
         # if continous:
