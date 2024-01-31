@@ -14,83 +14,36 @@ from DataProcess import GetWindSet
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 # from draw import draw_pics
+import options as option
+import utils as util
+import math
+from models import create_model
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
-parser.add_argument("--lr", type=float, default=0.0001, help="adam: learning rate")
-parser.add_argument("--b", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--n_cpu", type=int, default=2, help="number of cpu threads to use during batch generation")
-parser.add_argument("--dim", type=int, default=1024, help="dimensionality of the latent space")
-parser.add_argument("--image_size", type=int, default=96, help="size of each image dimension")
-parser.add_argument("--channels", type=int, default=2, help="number of image channels")
-parser.add_argument("--schedule", type=str, default='linear')
-parser.add_argument("--linear_start", type=float, default=1e-6)
-parser.add_argument("--linear_end", type=float, default=1e-2)
-parser.add_argument("--conditional", type=bool, default=True)
-parser.add_argument("--n_iter", type=int, default=1000000)
+parser.add_argument("-opt", type=str,
+                    default='/home/hy4080/PycharmProjects/multiTask/Exp/denoising-sde/options/train/ir-sde.yml',
+                    help="Path to option YMAL file.")
+parser.add_argument("--local_rank", type=int, default=0)
+args = parser.parse_args()
+opt = option.parse(args.opt, is_train=True)
 
-parser.add_argument("--in_channel", type=int, default=4)
-parser.add_argument("--out_channel", type=int, default=2)
-parser.add_argument("--inner_channel", type=int, default=32)
-parser.add_argument("--norm_groups", type=int, default=32)
-parser.add_argument("--channel_mults", type=tuple, default=(1, 2, 4, 8, 8))
-parser.add_argument("--attn_res", type=tuple, default=(6,))
-parser.add_argument("--res_blocks", type=int, default=3)
-parser.add_argument("--with_time_emb", type=bool, default=True)
-
-parser.add_argument("--dropout", type=float, default=0.)
-parser.add_argument("--device", type=str, default="cpu")
-
-parser.add_argument("--n_epochs", type=int, default=400, help="number of epochs of training")
-parser.add_argument("--mode", type=str, default='test', help="[train, test]")
-parser.add_argument("--n_timestep", type=int, default=2000)
-parser.add_argument("--file", type=str, default='diff_i2000')
-opt = parser.parse_args()
+opt = option.dict_to_nonedict(opt)
+torch.backends.cudnn.benchmark = True
 # 设置cuda:(cuda:0)
-opt.device, = [torch.device("cuda:0" if torch.cuda.is_available() else "cpu")]
+opt.device, = [torch.device("cuda:1" if torch.cuda.is_available() else "cpu")]
 
-model = UNet(
-    in_channel=opt.in_channel,
-    out_channel=opt.out_channel,
-    norm_groups=opt.norm_groups,
-    inner_channel=opt.inner_channel,
-    channel_mults=opt.channel_mults,
-    attn_res=opt.attn_res,
-    res_blocks=opt.res_blocks,
-    dropout=opt.dropout,
-    image_size=opt.image_size
-)
-netG = GaussianDiffusion(
-    model,
-    image_size=opt.image_size,
-    channels=opt.channels,
-    loss_type='l1',  # L1 or L2
-    conditional=opt.conditional,
-    schedule_opt={
-        'schedule': opt.schedule,
-        'n_timestep': opt.n_timestep,
-        'linear_start': opt.linear_start,
-        'linear_end': opt.linear_end
-    },
-    device=opt.device
-)
+model = create_model(opt)  # load pretrained model of SFTMD
+device = model.device
 
 if __name__ == '__main__':
-    opt.file = 'diff_i{}_e{}'.format(opt.n_timestep, opt.n_epochs)
+    opt.file = 'diff_i{}_e{}_{}_{}'.format(opt.n_timestep, opt.n_epochs, opt.linear_start, opt.linear_end)
+    # opt.file = 'diff_i{}_e{}'.format(opt.n_timestep, opt.n_epochs)
     path = '/home/hy4080/PycharmProjects/multiTask'
     image_path = os.path.join(path, 'images', opt.file)
     save_path = os.path.join(path, 'save', opt.file)
     os.makedirs(image_path, exist_ok=True)
     os.makedirs(save_path, exist_ok=True)
-    netG = netG.to(opt.device)
-
-    netG.train()
-    optim_params = list(netG.parameters())
-
-    optimizer = torch.optim.Adam(optim_params, lr=opt.lr)
-    if torch.cuda.is_available():
-        generator = netG.cuda()
 
     train_loss = []
     valid_loss = []
@@ -113,23 +66,16 @@ if __name__ == '__main__':
     # gfsv_data = (gfsv_data + 54.8) / (60.6 + 54.8) * 2 - 1
     # era5v_data = (era5v_data + 54.8) / (60.6 + 54.8) * 2 - 1
     if opt.mode == 'train':
-        def weights_init_orthogonal(m):
-            classname = m.__class__.__name__
-            if classname.find('Conv') != -1:
-                init.orthogonal_(m.weight.data, gain=1)
-                if m.bias is not None:
-                    m.bias.data.zero_()
-            elif classname.find('Linear') != -1:
-                init.orthogonal_(m.weight.data, gain=1)
-                if m.bias is not None:
-                    m.bias.data.zero_()
-            elif classname.find('BatchNorm2d') != -1:
-                init.orthogonal_(m.weight.data, 1.0)
-                init.orthogonal_(m.bias.data, 0.0)
-        netG.apply(weights_init_orthogonal)
-        wind_train = GetWindSet(gfs_data_1=gfsu_data[:9000], era5_data_1=era5u_data[:9000], gfs_data_2=gfsv_data[:9000],
-                                era5_data_2=era5v_data[:9000])
-        train_dataloader = DataLoader(wind_train, batch_size=opt.batch_size, shuffle=False, drop_last=False, num_workers=2)
+        train_set = GetWindSet(gfs_data_1=gfsu_data[:9000],
+                               era5_data_1=era5u_data[:9000],
+                               gfs_data_2=gfsv_data[:9000],
+                               era5_data_2=era5v_data[:9000])
+        train_loader = DataLoader(train_set, batch_size=dataset_opt['batch_size'], shuffle=dataset_opt['use_shuffle'],
+                                  drop_last=False,
+                                  num_workers=dataset_opt['n_workers'])
+        train_size = int(math.ceil(len(train_set) / dataset_opt["batch_size"]))
+        total_iters = int(opt["train"]["niter"])
+        total_epochs = int(math.ceil(total_iters / train_size))
 
         for epoch in range(opt.n_epochs):
 
@@ -137,8 +83,10 @@ if __name__ == '__main__':
             for i, (dataX, dataY) in enumerate(train_dataloader):
                 dataX = dataX.to(torch.float32).to(opt.device)
                 dataY = dataY.to(torch.float32).to(opt.device)
+                bias = dataY - dataX
+                bias = bias.to(torch.float32).to(opt.device)
 
-                loss = netG(dataX, dataY)
+                loss = netG(dataX, bias)
                 b, c, h, w = dataX.shape
                 loss = loss.sum() / (b*c*h*w)
                 optimizer.zero_grad()  # 梯度归0
@@ -185,15 +133,31 @@ if __name__ == '__main__':
                 print('第{}次测试'.format(i+1))
                 img = netG.p_sample_loop(dataX, continous=True)
 
+            bc_result = dataX + img
             origin = dataX.cpu().numpy()
-            predict_result = img.cpu().numpy()
+            predict_result = bc_result.cpu().numpy()
             label = dataY.cpu().numpy()
-            print('u10 rmse:', np.sqrt(np.sum((origin[:, 0]-label[:, 0])**2)/(b*h*w)))
-            print('v10 rmse:', np.sqrt(np.sum((origin[:, 1]-label[:, 1])**2)/(b*h*w)))
-            print('u10 bc rmse:', np.sqrt(np.sum((predict_result[:, 0]-label[:, 0])**2)/(b*h*w)))
-            print('v10 bc rmse:', np.sqrt(np.sum((predict_result[:, 1]-label[:, 1])**2)/(b*h*w)))
+            ori_rmse = np.sqrt(np.sum((origin-label)**2)/(b*c*h*w))
+            bc_rmse = np.sqrt(np.sum((predict_result-label)**2)/(b*c*h*w))
+            u10_rmse = np.sqrt(np.sum((origin[:, 0]-label[:, 0])**2)/(b*h*w))
+            v10_rmse = np.sqrt(np.sum((origin[:, 1]-label[:, 1])**2)/(b*h*w))
+            u10_bc_rmse = np.sqrt(np.sum((predict_result[:, 0]-label[:, 0])**2)/(b*h*w))
+            v10_bc_rmse = np.sqrt(np.sum((predict_result[:, 1]-label[:, 1])**2)/(b*h*w))
+            print('u10 rmse:', u10_rmse)
+            print('v10 rmse:', v10_rmse)
+            print('origin rmse:', ori_rmse)
+            print('u10 bc rmse:', u10_bc_rmse)
+            print('v10 bc rmse:', v10_bc_rmse)
+            print('bc rmse:', bc_rmse)
+            print('u10:', (u10_rmse - u10_bc_rmse)/u10_rmse)
+            print('v10:', (v10_rmse - v10_bc_rmse)/v10_rmse)
+            print('result:', (ori_rmse - bc_rmse)/ori_rmse)
 
             save_image(dataX.data[:4], os.path.join(image_path, 'gfs_%d.png' % (i * opt.batch_size)), nrow=2,
                        normalize=True)
-            save_image(img.data[:4], os.path.join(image_path, 'bc_%d.png' % (i * opt.batch_size)), nrow=2, normalize=True)
+            save_image(bc_result.data[:4], os.path.join(image_path, 'bc_%d.png' % (i * opt.batch_size)), nrow=2, normalize=True)
             save_image(dataY.data[:4], os.path.join(image_path, 'gt_%d.png' % (i * opt.batch_size)), nrow=2, normalize=True)
+            save_image(img.data[:4], os.path.join(image_path, 'gt-bc_%d.png' % (i * opt.batch_size)), nrow=2,
+                       normalize=True)
+            save_image((dataY - dataX).data[:4], os.path.join(image_path, 'gt-gfs_%d.png' % (i * opt.batch_size)), nrow=2,
+                       normalize=True)
