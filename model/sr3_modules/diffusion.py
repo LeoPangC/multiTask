@@ -229,7 +229,9 @@ class GaussianDiffusion(nn.Module):
     def forward(self, dataX, dataY, noise=None):
         # HR 就是dataY
         [b, c, h, w] = dataY.shape
+        # 随机产生一个时间步
         t = np.random.randint(1, self.num_timesteps + 1)
+        # 产生一个长度为b的均值，并转为张量|continuous_sqrt_alpha_cumprod = (b,)
         continuous_sqrt_alpha_cumprod = torch.FloatTensor(
             np.random.uniform(
                 self.sqrt_alphas_cumprod_prev[t-1],
@@ -237,18 +239,15 @@ class GaussianDiffusion(nn.Module):
                 size=b
             )
         ).to(dataY.device)
+        # 张量转换|continuous_sqrt_alpha_cumprod = (b,1)
         continuous_sqrt_alpha_cumprod = continuous_sqrt_alpha_cumprod.view(
             b, -1)
-
+        # 生成噪声|noise = (b, c, h, w)
         noise = default(noise, lambda: torch.randn_like(dataY))
         x_noisy = self.q_sample(
             x_start=dataY, continuous_sqrt_alpha_cumprod=continuous_sqrt_alpha_cumprod.view(-1, 1, 1, 1), noise=noise)
 
-        if not self.conditional:
-            x_recon = self.denoise_fn(x_noisy, continuous_sqrt_alpha_cumprod)
-        else:
-            x_recon = self.denoise_fn(
-                torch.cat([dataX, x_noisy], dim=1), continuous_sqrt_alpha_cumprod)
+        x_recon = self.denoise_fn(torch.cat([dataX, x_noisy], dim=1), continuous_sqrt_alpha_cumprod)
 
         loss = self.loss_func(noise, x_recon)
         return loss

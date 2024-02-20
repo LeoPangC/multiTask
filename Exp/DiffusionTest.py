@@ -44,7 +44,7 @@ parser.add_argument("--device", type=str, default="cpu")
 
 parser.add_argument("--n_epochs", type=int, default=400, help="number of epochs of training")
 parser.add_argument("--mode", type=str, default='test', help="[train, test]")
-parser.add_argument("--n_timestep", type=int, default=2000)
+parser.add_argument("--n_timestep", type=int, default=4000)
 parser.add_argument("--file", type=str, default='diff_i2000')
 opt = parser.parse_args()
 # 设置cuda:(cuda:0)
