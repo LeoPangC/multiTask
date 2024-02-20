@@ -176,8 +176,7 @@ class GaussianDiffusion(nn.Module):
             x=x, t=t, clip_denoised=clip_denoised, condition_x=condition_x)
         noise = noise_like(x.shape, device, repeat_noise)
         # no noise when t == 0
-        nonzero_mask = (1 - (t == 0).float()).reshape(b,
-                                                      *((1,) * (len(x.shape) - 1)))
+        nonzero_mask = (1 - (t == 0).float()).reshape(b, *((1,) * (len(x.shape) - 1)))
         return model_mean + nonzero_mask * (0.5 * model_log_variance).exp() * noise
         # return model_mean + (0.5 * model_log_variance).exp() * noise
 
@@ -234,7 +233,7 @@ class GaussianDiffusion(nn.Module):
             (1 - continuous_sqrt_alpha_cumprod**2).sqrt() * noise
         )
 
-    def p_loss_1(self, dataX, dataY, noise=None):
+    def p_losses_1(self, dataX, dataY, noise=None):
         b, _, _, _ = dataY.shape
         # t = np.random.randint(1, self.num_timesteps + 1)
         t = torch.randint(0, self.num_timesteps, (b,), device=dataX.device)
@@ -247,7 +246,7 @@ class GaussianDiffusion(nn.Module):
         loss = self.loss_func(noise, x_recon)
         return loss
 
-    def p_loss_2(self, dataX, dataY, noise=None):
+    def p_losses_2(self, dataX, dataY, noise=None):
         b, _, _, _ = dataY.shape
         t = np.random.randint(1, self.num_timesteps + 1)
         # t = torch.randint(0, self.num_timesteps, (b,), device=dataX.device)
@@ -273,5 +272,5 @@ class GaussianDiffusion(nn.Module):
         return loss
 
     def forward(self, dataX, dataY, noise=None):
-        loss = self.p_loss_2(dataX, dataY, noise)
+        loss = self.p_losses_1(dataX, dataY, noise)
         return loss
