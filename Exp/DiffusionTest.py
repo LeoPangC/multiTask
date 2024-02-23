@@ -8,11 +8,15 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch
 from torch.nn import init
+# from model.diffusion.diffusion import GaussianDiffusion
+# from model.diffusion.unet import UNet
 from model.diffusion.diffusion import GaussianDiffusion
 from model.diffusion.unet import UNet
 from DataProcess import GetWindSet
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
 # from draw import draw_pics
 
 
@@ -43,8 +47,8 @@ parser.add_argument("--dropout", type=float, default=0.)
 parser.add_argument("--device", type=str, default="cpu")
 
 parser.add_argument("--n_epochs", type=int, default=400, help="number of epochs of training")
-parser.add_argument("--mode", type=str, default='test', help="[train, test]")
-parser.add_argument("--n_timestep", type=int, default=4000)
+parser.add_argument("--mode", type=str, default='train', help="[train, test]")
+parser.add_argument("--n_timestep", type=int, default=6000)
 parser.add_argument("--file", type=str, default='diff_i2000')
 opt = parser.parse_args()
 # 设置cuda:(cuda:0)
@@ -137,6 +141,7 @@ if __name__ == '__main__':
             for i, (dataX, dataY) in enumerate(train_dataloader):
                 dataX = dataX.to(torch.float32).to(opt.device)
                 dataY = dataY.to(torch.float32).to(opt.device)
+                # dataY = (dataY - dataX).to(torch.float32).to(opt.device)
 
                 loss = netG(dataX, dataY)
                 b, c, h, w = dataX.shape
@@ -150,7 +155,7 @@ if __name__ == '__main__':
                     print("epoch={}/{},{}/{}of train, loss={}".format(
                         epoch, opt.n_epochs, i, len(train_dataloader), loss.item()))
 
-            if (epoch + 1) % 10 == 0 and epoch >= 10:
+            if epoch == (opt.n_epochs - 1):
                 state_dict = netG.state_dict()
                 for key, param in state_dict.items():
                     state_dict[key] = param.cpu()
@@ -179,21 +184,39 @@ if __name__ == '__main__':
             b, c, h, w = dataX.shape
             dataX = dataX.to(torch.float32).to(opt.device)
             dataY = dataY.to(torch.float32).to(opt.device)
+            bias = (dataY - dataX).to(torch.float32).to(opt.device)
             netG.load_state_dict(torch.load(os.path.join(save_path, 'diffusion_{}'.format(opt.n_epochs-1))))
             netG.eval()
             with torch.no_grad():
                 print('第{}次测试'.format(i+1))
-                img = netG.p_sample_loop(dataX, continous=True)
+                img, ret_img = netG.p_sample_loop(dataX, continous=True)
 
             origin = dataX.cpu().numpy()
+            # predict_result = (dataX + img).cpu().numpy()
             predict_result = img.cpu().numpy()
+            # ret_img = ret_img.cpu().numpy()
             label = dataY.cpu().numpy()
-            print('u10 rmse:', np.sqrt(np.sum((origin[:, 0]-label[:, 0])**2)/(b*h*w)))
-            print('v10 rmse:', np.sqrt(np.sum((origin[:, 1]-label[:, 1])**2)/(b*h*w)))
-            print('u10 bc rmse:', np.sqrt(np.sum((predict_result[:, 0]-label[:, 0])**2)/(b*h*w)))
-            print('v10 bc rmse:', np.sqrt(np.sum((predict_result[:, 1]-label[:, 1])**2)/(b*h*w)))
+
+            u10_rmse = np.sqrt(np.sum((origin[:, 0]-label[:, 0])**2)/(b*h*w))
+            v10_rmse = np.sqrt(np.sum((origin[:, 1]-label[:, 1])**2)/(b*h*w))
+            wind_rmse = np.sqrt(np.sum((origin - label) ** 2) / (b * h * w))
+            u10_bc_rmse = np.sqrt(np.sum((predict_result[:, 0]-label[:, 0])**2)/(b*h*w))
+            v10_bc_rmse = np.sqrt(np.sum((predict_result[:, 1]-label[:, 1])**2)/(b*h*w))
+            wind_bc_rmse = np.sqrt(np.sum((predict_result - label) ** 2) / (b * h * w))
+            print('u10 rmse:', u10_rmse)
+            print('v10 rmse:', v10_rmse)
+            print('wind rmse:', wind_rmse)
+            print('u10 bc rmse:', u10_bc_rmse)
+            print('v10 bc rmse:', v10_bc_rmse)
+            print('wind bc rmse:', wind_bc_rmse)
+            print('percentage:', (wind_rmse - wind_bc_rmse)/wind_rmse)
 
             save_image(dataX.data[:4], os.path.join(image_path, 'gfs_%d.png' % (i * opt.batch_size)), nrow=2,
                        normalize=True)
-            save_image(img.data[:4], os.path.join(image_path, 'bc_%d.png' % (i * opt.batch_size)), nrow=2, normalize=True)
+            predict_result = torch.tensor(predict_result)
+            save_image(predict_result.data[:4], os.path.join(image_path, 'bc_%d.png' % (i * opt.batch_size)), nrow=2, normalize=True)
             save_image(dataY.data[:4], os.path.join(image_path, 'gt_%d.png' % (i * opt.batch_size)), nrow=2, normalize=True)
+            save_image((dataY - dataX).data[:4], os.path.join(image_path, 'ori_diff_%d.png' % (i * opt.batch_size)), nrow=2,
+                       normalize=True)
+            save_image((predict_result-origin).data[:4], os.path.join(image_path, 'res_diff_%d.png' % (i * opt.batch_size)), nrow=2,
+                       normalize=True)

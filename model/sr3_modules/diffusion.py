@@ -164,8 +164,8 @@ class GaussianDiffusion(nn.Module):
             x_recon = self.predict_start_from_noise(
                 x, t=t, noise=self.denoise_fn(x, noise_level))
 
-        if clip_denoised:
-            x_recon.clamp_(-1., 1.)
+        # if clip_denoised:
+        #     x_recon.clamp_(-1., 1.)
 
         model_mean, posterior_log_variance = self.q_posterior(
             x_start=x_recon, x_t=x, t=t)
@@ -205,7 +205,7 @@ class GaussianDiffusion(nn.Module):
         #     return ret_img
         # else:
         #     return ret_img[-1]
-        return img
+        return img, ret_img
 
     @torch.no_grad()
     def sample(self, batch_size=1, continous=False):

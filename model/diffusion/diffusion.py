@@ -170,8 +170,8 @@ class GaussianDiffusion(nn.Module):
         return model_mean, posterior_variance, posterior_log_variance
 
     @torch.no_grad()
-    def p_sample(self, x, t, clip_denoised=True, repeat_noise=False, condition_x=None):
-        b, *_, device = *x.shape, x.deviceb
+    def p_sample(self, x, t, clip_denoised=False, repeat_noise=False, condition_x=None):
+        b, *_, device = *x.shape, x.device
         model_mean, _, model_log_variance = self.p_mean_variance(
             x=x, t=t, clip_denoised=clip_denoised, condition_x=condition_x)
         noise = noise_like(x.shape, device, repeat_noise)
@@ -183,25 +183,21 @@ class GaussianDiffusion(nn.Module):
     @torch.no_grad()
     def p_sample_loop(self, x_in, continous=False):
         device = self.betas.device
-        # sample_inter = (1 | (self.num_timesteps//10))
+        sample_inter = (1 | (self.num_timesteps//10))
 
         x = x_in
         shape = x.shape
         b = shape[0]
         img = torch.randn(shape, device=device)
-        # ret_img = x
+        ret_img = x
         for i in reversed(range(0, self.num_timesteps)):
             # 时间参数有待修改
-            # t = torch.FloatTensor(np.random.uniform(
-            #     self.sqrt_alphas_cumprod_prev[i],
-            #     self.sqrt_alphas_cumprod_prev[i+1],
-            #     size=b)
-            # ).to(self.device)
-            # img = self.p_sample(img, t, condition_x=x)
             img = self.p_sample(img, torch.full(
                 (b,), i, device=device, dtype=torch.long), condition_x=x)
+            if i % sample_inter == 0:
+                ret_img = torch.cat([ret_img, img], dim=0)
 
-        return img
+        return img, ret_img
         # if continous:
         #     return ret_img
         # else:
