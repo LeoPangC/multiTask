@@ -1,28 +1,28 @@
 import argparse
 import os
 import numpy as np
-import torchvision.transforms as transforms
 from torchvision.utils import save_image
 from torchvision import datasets
 from torch.autograd import Variable
 import torch.nn as nn
 import torch
 from torch.nn import init
-# from model.diffusion.diffusion import GaussianDiffusion
-# from model.diffusion.unet import UNet
 from model.diffusion.diffusion import GaussianDiffusion
 from model.diffusion.unet import UNet
+# from model.sr3_modules.diffusion import GaussianDiffusion
+# from model.sr3_modules.unet import UNet
 from DataProcess import GetWindSet
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
-
-from sklearn.preprocessing import StandardScaler
+from utils.draw_wind import wind_quiver
+from torchvision.transforms import functional as trans_fn
+# from sklearn.preprocessing import StandardScaler
 # from draw import draw_pics
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
-parser.add_argument("--lr", type=float, default=0.0001, help="adam: learning rate")
+parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--n_cpu", type=int, default=2, help="number of cpu threads to use during batch generation")
 parser.add_argument("--dim", type=int, default=1024, help="dimensionality of the latent space")
@@ -47,8 +47,8 @@ parser.add_argument("--dropout", type=float, default=0.)
 parser.add_argument("--device", type=str, default="cpu")
 
 parser.add_argument("--n_epochs", type=int, default=400, help="number of epochs of training")
-parser.add_argument("--mode", type=str, default='train', help="[train, test]")
-parser.add_argument("--n_timestep", type=int, default=6000)
+parser.add_argument("--mode", type=str, default='test', help="[train, test]")
+parser.add_argument("--n_timestep", type=int, default=4500)
 parser.add_argument("--file", type=str, default='diff_i2000')
 opt = parser.parse_args()
 # 设置cuda:(cuda:0)
@@ -139,6 +139,8 @@ if __name__ == '__main__':
 
             train_epoch_loss = []
             for i, (dataX, dataY) in enumerate(train_dataloader):
+                # dataX = trans_fn.resize(dataX, 24)
+                # dataX = trans_fn.resize(dataX, 96)
                 dataX = dataX.to(torch.float32).to(opt.device)
                 dataY = dataY.to(torch.float32).to(opt.device)
                 # dataY = (dataY - dataX).to(torch.float32).to(opt.device)
@@ -181,10 +183,13 @@ if __name__ == '__main__':
         test_dataloader = DataLoader(wind_test, batch_size=opt.batch_size, shuffle=False, drop_last=False, num_workers=2)
         print('test beginning')
         for i, (dataX, dataY) in enumerate(test_dataloader):
+            # hr = trans_fn.resize(dataX, 24)
+            # hr = trans_fn.resize(hr, 96)
             b, c, h, w = dataX.shape
+            # hr = hr.to(torch.float32).to(opt.device)
             dataX = dataX.to(torch.float32).to(opt.device)
             dataY = dataY.to(torch.float32).to(opt.device)
-            bias = (dataY - dataX).to(torch.float32).to(opt.device)
+            # bias = (dataY - dataX).to(torch.float32).to(opt.device)
             netG.load_state_dict(torch.load(os.path.join(save_path, 'diffusion_{}'.format(opt.n_epochs-1))))
             netG.eval()
             with torch.no_grad():
@@ -196,6 +201,9 @@ if __name__ == '__main__':
             predict_result = img.cpu().numpy()
             # ret_img = ret_img.cpu().numpy()
             label = dataY.cpu().numpy()
+            np.save('/home/hy4080/PycharmProjects/multiTask/Dataset/test/bc_32.npy', predict_result)
+            np.save('/home/hy4080/PycharmProjects/multiTask/Dataset/test/origin_32.npy', origin)
+            np.save('/home/hy4080/PycharmProjects/multiTask/Dataset/test/label_32.npy', label)
 
             u10_rmse = np.sqrt(np.sum((origin[:, 0]-label[:, 0])**2)/(b*h*w))
             v10_rmse = np.sqrt(np.sum((origin[:, 1]-label[:, 1])**2)/(b*h*w))
@@ -211,6 +219,7 @@ if __name__ == '__main__':
             print('wind bc rmse:', wind_bc_rmse)
             print('percentage:', (wind_rmse - wind_bc_rmse)/wind_rmse)
 
+            wind_quiver(origin, predict_result, label, image_path)
             save_image(dataX.data[:4], os.path.join(image_path, 'gfs_%d.png' % (i * opt.batch_size)), nrow=2,
                        normalize=True)
             predict_result = torch.tensor(predict_result)
